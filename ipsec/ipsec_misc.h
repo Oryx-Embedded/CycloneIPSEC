@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 #ifndef _IPSEC_MISC_H
@@ -38,6 +38,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+//IPsec related constants
+extern const uint8_t IPSEC_INVALID_SPI[4];
 
 //IPsec related functions
 IpsecSpdEntry *ipsecFindSpdEntry(IpsecContext *context,

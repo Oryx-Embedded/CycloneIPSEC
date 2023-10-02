@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 #ifndef _IPSEC_INBOUND_H
@@ -42,6 +42,12 @@ extern "C" {
 //IPsec related functions
 error_t ipsecProcessInboundIpv4Packet(NetInterface *interface,
    const Ipv4Header *ipv4Header, const NetBuffer *buffer, size_t offset);
+
+error_t ipsecGetInboundIpv4PacketSelector(const Ipv4Header *ipv4Header,
+   uint8_t nextHeader, const NetBuffer *buffer, size_t offset,
+   IpsecSelector *selector);
+
+uint64_t ipsecGetSeqNum(IpsecSadEntry *sa, uint32_t seql);
 
 //C++ guard
 #ifdef __cplusplus

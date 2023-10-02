@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 //Switch to the appropriate trace level
@@ -294,6 +294,9 @@ static const uint16_t ikeSupportedAuthAlgos[] =
 #if (IKE_CMAC_AUTH_SUPPORT == ENABLED && IKE_AES_128_SUPPORT == ENABLED)
    IKE_TRANSFORM_ID_AUTH_AES_CMAC_96,
 #endif
+#if (IKE_XCBC_MAC_AUTH_SUPPORT == ENABLED && IKE_AES_128_SUPPORT == ENABLED)
+   IKE_TRANSFORM_ID_AUTH_AES_XCBC_96,
+#endif
 #if (IKE_HMAC_AUTH_SUPPORT == ENABLED && IKE_SHA1_SUPPORT == ENABLED)
    IKE_TRANSFORM_ID_AUTH_HMAC_SHA1_96,
 #endif
@@ -321,6 +324,9 @@ static const uint16_t ikeSupportedPrfAlgos[] =
 #endif
 #if (IKE_CMAC_PRF_SUPPORT == ENABLED && IKE_AES_128_SUPPORT == ENABLED)
    IKE_TRANSFORM_ID_PRF_AES128_CMAC,
+#endif
+#if (IKE_XCBC_MAC_PRF_SUPPORT == ENABLED && IKE_AES_128_SUPPORT == ENABLED)
+   IKE_TRANSFORM_ID_PRF_AES128_XCBC,
 #endif
 #if (IKE_HMAC_PRF_SUPPORT == ENABLED && IKE_TIGER_SUPPORT == ENABLED)
    IKE_TRANSFORM_ID_PRF_HMAC_TIGER,
@@ -938,17 +944,6 @@ error_t ikeSelectAuthAlgo(IkeSaEntry *sa, uint16_t authAlgoId)
    //Initialize status code
    error = NO_ERROR;
 
-#if (IKE_CMAC_AUTH_SUPPORT == ENABLED && IKE_AES_128_SUPPORT == ENABLED)
-   //AES-CMAC-96 authentication algorithm?
-   if(authAlgoId == IKE_TRANSFORM_ID_AUTH_AES_CMAC_96)
-   {
-      sa->authHashAlgo = NULL;
-      sa->authCipherAlgo = AES_CIPHER_ALGO;
-      sa->authKeyLen = 16;
-      sa->icvLen = 12;
-   }
-   else
-#endif
 #if (IKE_HMAC_AUTH_SUPPORT == ENABLED && IKE_MD5_SUPPORT == ENABLED)
    //HMAC-MD5-96 authentication algorithm?
    if(authAlgoId == IKE_TRANSFORM_ID_AUTH_HMAC_MD5_96)
@@ -1004,6 +999,28 @@ error_t ikeSelectAuthAlgo(IkeSaEntry *sa, uint16_t authAlgoId)
    }
    else
 #endif
+#if (IKE_CMAC_AUTH_SUPPORT == ENABLED && IKE_AES_128_SUPPORT == ENABLED)
+   //AES-CMAC-96 authentication algorithm?
+   if(authAlgoId == IKE_TRANSFORM_ID_AUTH_AES_CMAC_96)
+   {
+      sa->authHashAlgo = NULL;
+      sa->authCipherAlgo = AES_CIPHER_ALGO;
+      sa->authKeyLen = 16;
+      sa->icvLen = 12;
+   }
+   else
+#endif
+#if (IKE_XCBC_MAC_AUTH_SUPPORT == ENABLED && IKE_AES_128_SUPPORT == ENABLED)
+   //AES-XCBC-MAC-96 authentication algorithm?
+   if(authAlgoId == IKE_TRANSFORM_ID_AUTH_AES_XCBC_96)
+   {
+      sa->authHashAlgo = NULL;
+      sa->authCipherAlgo = AES_CIPHER_ALGO;
+      sa->authKeyLen = 16;
+      sa->icvLen = 12;
+   }
+   else
+#endif
    //Unknown authentication algorithm?
    {
       //Report an error
@@ -1029,16 +1046,6 @@ error_t ikeSelectPrfAlgo(IkeSaEntry *sa, uint16_t prfAlgoId)
    //Initialize status code
    error = NO_ERROR;
 
-#if (IKE_CMAC_PRF_SUPPORT == ENABLED && IKE_AES_128_SUPPORT == ENABLED)
-   //AES128-CMAC PRF algorithm?
-   if(prfAlgoId == IKE_TRANSFORM_ID_PRF_AES128_CMAC)
-   {
-      sa->prfHashAlgo = NULL;
-      sa->prfCipherAlgo = AES_CIPHER_ALGO;
-      sa->prfKeyLen = 16;
-   }
-   else
-#endif
 #if (IKE_HMAC_PRF_SUPPORT == ENABLED && IKE_MD5_SUPPORT == ENABLED)
    //HMAC-MD5 PRF algorithm?
    if(prfAlgoId == IKE_TRANSFORM_ID_PRF_HMAC_MD5)
@@ -1096,6 +1103,26 @@ error_t ikeSelectPrfAlgo(IkeSaEntry *sa, uint16_t prfAlgoId)
       sa->prfHashAlgo = TIGER_HASH_ALGO;
       sa->prfCipherAlgo = NULL;
       sa->prfKeyLen = TIGER_DIGEST_SIZE;
+   }
+   else
+#endif
+#if (IKE_CMAC_PRF_SUPPORT == ENABLED && IKE_AES_128_SUPPORT == ENABLED)
+   //AES-CMAC PRF algorithm?
+   if(prfAlgoId == IKE_TRANSFORM_ID_PRF_AES128_CMAC)
+   {
+      sa->prfHashAlgo = NULL;
+      sa->prfCipherAlgo = AES_CIPHER_ALGO;
+      sa->prfKeyLen = 16;
+   }
+   else
+#endif
+#if (IKE_XCBC_MAC_PRF_SUPPORT == ENABLED && IKE_AES_128_SUPPORT == ENABLED)
+   //AES-XCBC-MAC PRF algorithm?
+   if(prfAlgoId == IKE_TRANSFORM_ID_PRF_AES128_XCBC)
+   {
+      sa->prfHashAlgo = NULL;
+      sa->prfCipherAlgo = AES_CIPHER_ALGO;
+      sa->prfKeyLen = 16;
    }
    else
 #endif
@@ -1450,9 +1477,18 @@ uint16_t ikeSelectTransform(IkeTransformType transformType,
    uint16_t selectedAlgo;
    IkeTransform *transform;
 
-   //Initialize variables
-   selectedAlgo = IKE_TRANSFORM_ID_INVALID;
+   //Initialize flag
    found = FALSE;
+
+   //Key exchange transform negotiation?
+   if(transformType == IKE_TRANSFORM_TYPE_DH)
+   {
+      selectedAlgo = IKE_TRANSFORM_ID_DH_GROUP_NONE;
+   }
+   else
+   {
+      selectedAlgo = IKE_TRANSFORM_ID_INVALID;
+   }
 
    //Check the length of the Proposal substructure
    if(proposalLen >= sizeof(IkeProposal) &&
@@ -1822,7 +1858,7 @@ error_t ikeSelectChildSaProposal(IkeChildSaEntry *childSa,
 
 #if (AH_SUPPORT == ENABLED)
    //AH protocol identifier?
-   if(childSa->protocol == IKE_PROTOCOL_ID_AH)
+   if(childSa->protocol == IPSEC_PROTOCOL_AH)
    {
       error = ahSelectSaProposal(childSa, payload);
    }
@@ -1830,7 +1866,7 @@ error_t ikeSelectChildSaProposal(IkeChildSaEntry *childSa,
 #endif
 #if (ESP_SUPPORT == ENABLED)
    //ESP protocol identifier?
-   if(childSa->protocol == IKE_PROTOCOL_ID_ESP)
+   if(childSa->protocol == IPSEC_PROTOCOL_ESP)
    {
       error = espSelectSaProposal(childSa, payload);
    }
@@ -1996,7 +2032,7 @@ error_t ikeCheckChildSaProposal(IkeChildSaEntry *childSa,
 
 #if (AH_SUPPORT == ENABLED)
    //AH protocol identifier?
-   if(childSa->protocol == IKE_PROTOCOL_ID_AH)
+   if(childSa->protocol == IPSEC_PROTOCOL_AH)
    {
       error = ahCheckSaProposal(childSa, payload);
    }
@@ -2004,7 +2040,7 @@ error_t ikeCheckChildSaProposal(IkeChildSaEntry *childSa,
 #endif
 #if (ESP_SUPPORT == ENABLED)
    //ESP protocol identifier?
-   if(childSa->protocol == IKE_PROTOCOL_ID_ESP)
+   if(childSa->protocol == IPSEC_PROTOCOL_ESP)
    {
       error = espCheckSaProposal(childSa, payload);
    }

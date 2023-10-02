@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 //Switch to the appropriate trace level
@@ -152,58 +152,79 @@ error_t ikeProcessRequest(IkeContext *context, uint8_t *message, size_t length)
                //The responder must remember each response until it receives a
                //request whose sequence number is larger than or equal to the
                //sequence number in the response plus its window size
-               if(ntohl(ikeHeader->messageId) < sa->rxMessageId)
+               if(ntohl(ikeHeader->messageId) < sa->rxMessageId &&
+                  sa->rxMessageId != UINT32_MAX)
                {
                   //If the responder receives a retransmitted request for which
                   //it has already forgotten the response, it must ignore the
                   //request
                }
                else if(ntohl(ikeHeader->messageId) == sa->rxMessageId &&
-                  sa->responseLen > 0)
+                  sa->rxMessageId != UINT32_MAX)
                {
                   //The responder has received a retransmission of the request
                   error = ikeRetransmitResponse(sa);
                }
-               else
+               else if(ntohl(ikeHeader->messageId) == (sa->rxMessageId + 1))
                {
                   //The counter increments as requests are received
-                  sa->rxMessageId = ntohl(ikeHeader->messageId);
-                  //Forget the previous response
-                  sa->responseLen = 0;
-                  //Clear error notification
-                  sa->notifyMsgType = IKE_NOTIFY_MSG_TYPE_NONE;
+                  sa->rxMessageId++;
 
-                  //Check IKE exchange type
-                  if(exchangeType == IKE_EXCHANGE_TYPE_IKE_AUTH)
+                  //In the unlikely event that Message IDs grow too large to fit
+                  //in 32 bits, the IKE SA must be closed or rekeyed (refer to
+                  //RFC 7296, section 2.2)
+                  if(sa->rxMessageId == UINT32_MAX)
                   {
-                     //Process IKE_AUTH request
-                     error = ikeProcessIkeAuthRequest(sa, message, length);
-                  }
-                  else if(exchangeType == IKE_EXCHANGE_TYPE_CREATE_CHILD_SA)
-                  {
-                     //Process CREATE_CHILD_SA request
-                     error = ikeProcessCreateChildSaRequest(sa, message, length);
-                  }
-                  else if(exchangeType == IKE_EXCHANGE_TYPE_INFORMATIONAL)
-                  {
-                     //Process INFORMATIONAL request
-                     error = ikeProcessInformationalRequest(sa, message, length);
+                     //Delete the IKE SA
+                     ikeDeleteSaEntry(sa);
                   }
                   else
                   {
-                     //Unknown exchange type
-                     error = ERROR_UNKNOWN_TYPE;
-                  }
+                     //Forget the previous response
+                     sa->responseLen = 0;
+                     //Clear error notification
+                     sa->notifyMsgType = IKE_NOTIFY_MSG_TYPE_NONE;
 
-                  //Only authentication failures and malformed messages lead to
-                  //a deletion of the IKE SA without requiring an explicit
-                  //INFORMATIONAL exchange carrying a Delete payload
-                  if(sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_AUTHENTICATION_FAILED ||
-                     sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_INVALID_SYNTAX)
-                  {
-                     //This error notification is considered fatal in both peers
-                     ikeDeleteSaEntry(sa);
+                     //Check IKE exchange type
+                     if(exchangeType == IKE_EXCHANGE_TYPE_IKE_AUTH)
+                     {
+                        //Process IKE_AUTH request
+                        error = ikeProcessIkeAuthRequest(sa, message, length);
+                     }
+                     else if(exchangeType == IKE_EXCHANGE_TYPE_CREATE_CHILD_SA)
+                     {
+                        //Process CREATE_CHILD_SA request
+                        error = ikeProcessCreateChildSaRequest(sa, message,
+                           length);
+                     }
+                     else if(exchangeType == IKE_EXCHANGE_TYPE_INFORMATIONAL)
+                     {
+                        //Process INFORMATIONAL request
+                        error = ikeProcessInformationalRequest(sa, message,
+                           length);
+                     }
+                     else
+                     {
+                        //Unknown exchange type
+                        error = ERROR_UNKNOWN_TYPE;
+                     }
+
+                     //Only authentication failures (AUTHENTICATION_FAILED) and
+                     //malformed messages (INVALID_SYNTAX) lead to a deletion of
+                     //the IKE SA without requiring an explicit INFORMATIONAL
+                     //exchange carrying a Delete payload
+                     if(sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_AUTH_FAILED ||
+                        sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_INVALID_SYNTAX)
+                     {
+                        //This error notification is considered fatal in both peers
+                        ikeDeleteSaEntry(sa);
+                     }
                   }
+               }
+               else
+               {
+                  //Discard the request since the message ID is outside the
+                  //supported window
                }
             }
          }
@@ -263,63 +284,81 @@ error_t ikeProcessResponse(IkeContext *context, uint8_t *message, size_t length)
       //Check whether the receiving node has an active IKE SA
       if(sa != NULL)
       {
-         //The Message ID field is used to match requests and responses
-         if(ntohl(ikeHeader->messageId) == sa->txMessageId)
+         //Check the state of the IKE SA
+         if(sa->state == IKE_SA_STATE_INIT_RESP ||
+            sa->state == IKE_SA_STATE_AUTH_RESP ||
+            sa->state == IKE_SA_STATE_DPD_RESP ||
+            sa->state == IKE_SA_STATE_REKEY_RESP ||
+            sa->state == IKE_SA_STATE_DELETE_RESP ||
+            sa->state == IKE_SA_STATE_CREATE_CHILD_RESP ||
+            sa->state == IKE_SA_STATE_REKEY_CHILD_RESP ||
+            sa->state == IKE_SA_STATE_DELETE_CHILD_RESP ||
+            sa->state == IKE_SA_STATE_AUTH_FAILURE_RESP)
          {
-            //All messages following the initial exchange are cryptographically
-            //protected using the cryptographic algorithms and keys negotiated
-            //in the IKE_SA_INIT exchange (refer to RFC 7296, section 1.2)
-            if(exchangeType != IKE_EXCHANGE_TYPE_IKE_SA_INIT)
+            //The Message ID field is used to match requests and responses
+            if(ntohl(ikeHeader->messageId) == sa->txMessageId)
             {
-               //Decrypt IKE message
-               error = ikeDecryptMessage(sa, message, &length);
+               //All messages following the initial exchange are cryptographically
+               //protected using the cryptographic algorithms and keys negotiated
+               //in the IKE_SA_INIT exchange (refer to RFC 7296, section 1.2)
+               if(exchangeType != IKE_EXCHANGE_TYPE_IKE_SA_INIT)
+               {
+                  //Decrypt IKE message
+                  error = ikeDecryptMessage(sa, message, &length);
+               }
+
+               //Check status code
+               if(!error)
+               {
+                  //Check IKE exchange type
+                  if(exchangeType == IKE_EXCHANGE_TYPE_IKE_SA_INIT)
+                  {
+                     //Process IKE_SA_INIT response
+                     error = ikeProcessIkeSaInitResponse(sa, message, length);
+                  }
+                  else if(exchangeType == IKE_EXCHANGE_TYPE_IKE_AUTH)
+                  {
+                     //Process IKE_AUTH response
+                     error = ikeProcessIkeAuthResponse(sa, message, length);
+                  }
+                  else if(exchangeType == IKE_EXCHANGE_TYPE_CREATE_CHILD_SA)
+                  {
+                     //Process CREATE_CHILD_SA response
+                     error = ikeProcessCreateChildSaResponse(sa, message, length);
+                  }
+                  else if(exchangeType == IKE_EXCHANGE_TYPE_INFORMATIONAL)
+                  {
+                     //Process INFORMATIONAL response
+                     error = ikeProcessInformationalResponse(sa, message, length);
+                  }
+                  else
+                  {
+                     //Unknown exchange type
+                     error = ERROR_UNKNOWN_TYPE;
+                  }
+
+                  //Only authentication failures (AUTHENTICATION_FAILED) and
+                  //malformed messages (INVALID_SYNTAX) lead to a deletion of
+                  //the IKE SA without requiring an explicit INFORMATIONAL
+                  //exchange carrying a Delete payload
+                  if(sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_AUTH_FAILED ||
+                     sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_INVALID_SYNTAX)
+                  {
+                     //This error notification is considered fatal in both peers
+                     ikeDeleteSaEntry(sa);
+                  }
+               }
             }
-
-            //Check status code
-            if(!error)
+            else
             {
-               //Check IKE exchange type
-               if(exchangeType == IKE_EXCHANGE_TYPE_IKE_SA_INIT)
-               {
-                  //Process IKE_SA_INIT response
-                  error = ikeProcessIkeSaInitResponse(sa, message, length);
-               }
-               else if(exchangeType == IKE_EXCHANGE_TYPE_IKE_AUTH)
-               {
-                  //Process IKE_AUTH response
-                  error = ikeProcessIkeAuthResponse(sa, message, length);
-               }
-               else if(exchangeType == IKE_EXCHANGE_TYPE_CREATE_CHILD_SA)
-               {
-                  //Process CREATE_CHILD_SA response
-                  error = ikeProcessCreateChildSaResponse(sa, message, length);
-               }
-               else if(exchangeType == IKE_EXCHANGE_TYPE_INFORMATIONAL)
-               {
-                  //Process INFORMATIONAL response
-                  error = ikeProcessInformationalResponse(sa, message, length);
-               }
-               else
-               {
-                  //Unknown exchange type
-                  error = ERROR_UNKNOWN_TYPE;
-               }
-
-               //Only authentication failures and malformed messages lead to
-               //a deletion of the IKE SA without requiring an explicit
-               //INFORMATIONAL exchange carrying a Delete payload
-               if(sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_AUTHENTICATION_FAILED ||
-                  sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_INVALID_SYNTAX)
-               {
-                  //This error notification is considered fatal in both peers
-                  ikeDeleteSaEntry(sa);
-               }
+               //Unexpected Message ID
+               error = ERROR_WRONG_IDENTIFIER;
             }
          }
          else
          {
-            //Unexpected Message ID
-            error = ERROR_WRONG_IDENTIFIER;
+            //Unexpected response
+            error = ERROR_UNEXPECTED_MESSAGE;
          }
       }
       else
@@ -366,6 +405,15 @@ error_t ikeProcessIkeSaInitRequest(IkeContext *context, const uint8_t *message,
 
    //Each message begins with the IKE header
    ikeHeader = (IkeHeader *) message;
+
+   //The initiator's SPI must not be zero (refer to RFC 7296, section 3.1)
+   if(osMemcmp(ikeHeader->initiatorSpi, IKE_INVALID_SPI, IKE_SPI_SIZE) == 0)
+      return ERROR_INVALID_MESSAGE;
+
+   //The responder's SPI must be zero in the first message of an IKE initial
+   //exchange (including repeats of that message including a cookie)
+   if(osMemcmp(ikeHeader->responderSpi, IKE_INVALID_SPI, IKE_SPI_SIZE) != 0)
+      return ERROR_INVALID_MESSAGE;
 
    //The Message ID is a 32-bit quantity, which is zero for the IKE_SA_INIT
    //messages (including retries of the message due to responses such as
@@ -428,6 +476,9 @@ error_t ikeProcessIkeSaInitRequest(IkeContext *context, const uint8_t *message,
    //The original initiator always refers to the party who initiated the
    //exchange (refer to RFC 7296, section 2.2)
    sa->originalInitiator = FALSE;
+
+   //The Message ID is zero for the IKE_SA_INIT messages
+   sa->rxMessageId = 0;
 
    //Save initiator's IKE SPI
    osMemcpy(sa->initiatorSpi, ikeHeader->initiatorSpi, IKE_SPI_SIZE);
@@ -543,6 +594,16 @@ error_t ikeProcessIkeSaInitRequest(IkeContext *context, const uint8_t *message,
          }
       }
 #endif
+
+      //Check the syntax of the SAi payload
+      error = ikeParseSaPayload(saPayload);
+
+      //Malformed SAi payload?
+      if(error)
+      {
+         sa->notifyMsgType = IKE_NOTIFY_MSG_TYPE_INVALID_SYNTAX;
+         break;
+      }
 
       //The responder must choose a single suite, which may be any subset of
       //the SA proposal (refer to RFC 7296, section 2.7)
@@ -760,6 +821,13 @@ error_t ikeProcessIkeSaInitResponse(IkeSaEntry *sa, const uint8_t *message,
          break;
       }
 
+      //The responder's SPI must not be zero
+      if(osMemcmp(ikeHeader->responderSpi, IKE_INVALID_SPI, IKE_SPI_SIZE) == 0)
+      {
+         error = ERROR_INVALID_MESSAGE;
+         break;
+      }
+
       //Save responder's IKE SPI
       osMemcpy(sa->responderSpi, ikeHeader->responderSpi, IKE_SPI_SIZE);
 
@@ -767,6 +835,12 @@ error_t ikeProcessIkeSaInitResponse(IkeSaEntry *sa, const uint8_t *message,
       error = ikeParseNoncePayload(noncePayload, sa->responderNonce,
          &sa->responderNonceLen);
       //Malformed nonce?
+      if(error)
+         break;
+
+      //Check the syntax of the SAr payload
+      error = ikeParseSaPayload(saPayload);
+      //Malformed SAr payload?
       if(error)
          break;
 
@@ -954,7 +1028,7 @@ error_t ikeProcessIkeAuthRequest(IkeSaEntry *sa, const uint8_t *message,
       //AUTHENTICATION_FAILED notification
       if(padEntry == NULL)
       {
-         sa->notifyMsgType = IKE_NOTIFY_MSG_TYPE_AUTHENTICATION_FAILED;
+         sa->notifyMsgType = IKE_NOTIFY_MSG_TYPE_AUTH_FAILED;
          break;
       }
 
@@ -968,7 +1042,7 @@ error_t ikeProcessIkeAuthRequest(IkeSaEntry *sa, const uint8_t *message,
          //Failed to validate certificate chain?
          if(error)
          {
-            sa->notifyMsgType = IKE_NOTIFY_MSG_TYPE_AUTHENTICATION_FAILED;
+            sa->notifyMsgType = IKE_NOTIFY_MSG_TYPE_AUTH_FAILED;
             break;
          }
       }
@@ -982,7 +1056,7 @@ error_t ikeProcessIkeAuthRequest(IkeSaEntry *sa, const uint8_t *message,
       //Authentication failure?
       if(error)
       {
-         sa->notifyMsgType = IKE_NOTIFY_MSG_TYPE_AUTHENTICATION_FAILED;
+         sa->notifyMsgType = IKE_NOTIFY_MSG_TYPE_AUTH_FAILED;
          break;
       }
 
@@ -1024,9 +1098,7 @@ error_t ikeProcessIkeAuthRequest(IkeSaEntry *sa, const uint8_t *message,
          //Create a new Child SA
          childSa = ikeCreateChildSaEntry(sa->context);
 
-         //If creating the Child SA during the IKE_AUTH exchange fails for some
-         //reason, the IKE SA is still created as usual (refer to RFC 7296,
-         //section 1.2)
+         //Failed to create Child SA?
          if(childSa == NULL)
          {
             sa->notifyMsgType = IKE_NOTIFY_MSG_TYPE_TEMPORARY_FAILURE;
@@ -1058,6 +1130,16 @@ error_t ikeProcessIkeAuthRequest(IkeSaEntry *sa, const uint8_t *message,
          if(error)
          {
             sa->notifyMsgType = IKE_NOTIFY_MSG_TYPE_TS_UNACCEPTABLE;
+            break;
+         }
+
+         //Check the syntax of the SAi payload
+         error = ikeParseSaPayload(saPayload);
+
+         //Malformed SAi payload?
+         if(error)
+         {
+            sa->notifyMsgType = IKE_NOTIFY_MSG_TYPE_INVALID_SYNTAX;
             break;
          }
 
@@ -1105,9 +1187,11 @@ error_t ikeProcessIkeAuthRequest(IkeSaEntry *sa, const uint8_t *message,
    } while(0);
 
    //Failed to create Child SA?
-   if(sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_TEMPORARY_FAILURE ||
-      sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_NO_PROPOSAL_CHOSEN ||
-      sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_TS_UNACCEPTABLE)
+   if(sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_NO_PROPOSAL_CHOSEN ||
+      sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_TS_UNACCEPTABLE ||
+      sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_SINGLE_PAIR_REQUIRED ||
+      sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_INTERNAL_ADDRESS_FAILURE ||
+      sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_FAILED_CP_REQUIRED)
    {
       //If creating the Child SA during the IKE_AUTH exchange fails for some
       //reason, the IKE SA is still created as usual (refer to RFC 7296,
@@ -1285,6 +1369,12 @@ error_t ikeProcessIkeAuthResponse(IkeSaEntry *sa, const uint8_t *message,
                error = ERROR_INVALID_MESSAGE;
                break;
             }
+
+            //Check the syntax of the SAr payload
+            error = ikeParseSaPayload(saPayload);
+            //Malformed SAr payload?
+            if(error)
+               break;
 
             //The initiator of an exchange must check that the accepted offer
             //is consistent with one of its proposals, and if not must terminate
@@ -1516,7 +1606,7 @@ error_t ikeProcessInformationalRequest(IkeSaEntry *sa, const uint8_t *message,
          notifyMsgType = ntohs(notifyPayload->notifyMsgType);
 
          //Check error type
-         if(notifyMsgType == IKE_NOTIFY_MSG_TYPE_AUTHENTICATION_FAILED ||
+         if(notifyMsgType == IKE_NOTIFY_MSG_TYPE_AUTH_FAILED ||
             notifyMsgType == IKE_NOTIFY_MSG_TYPE_INVALID_SYNTAX)
          {
             //This error notification is considered fatal in both peers
@@ -1524,11 +1614,8 @@ error_t ikeProcessInformationalRequest(IkeSaEntry *sa, const uint8_t *message,
          }
          else
          {
-            //An implementation receiving an error type that it does not
-            //recognize in a response must assume that the corresponding
-            //request has failed entirely (refer to RFC 7296, section 3.10.1)
-            error = ERROR_UNEXPECTED_STATUS;
-            break;
+            //Unrecognized error types in a request must be ignored (refer to
+            //RFC 7296, section 3.10.1)
          }
       }
 

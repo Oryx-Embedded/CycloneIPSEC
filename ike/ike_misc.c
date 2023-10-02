@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 //Switch to the appropriate trace level
@@ -42,6 +42,9 @@
 
 //Check IKEv2 library configuration
 #if (IKE_SUPPORT == ENABLED)
+
+//Invalid IKE SPI value
+const uint8_t IKE_INVALID_SPI[8] = {0};
 
 
 /**
@@ -152,7 +155,7 @@ IkeSaEntry *ikeCreateSaEntry(IkeContext *context)
 
          //Initialize IKE SA parameters
          sa->txMessageId = UINT32_MAX;
-         sa->rxMessageId = 0;
+         sa->rxMessageId = UINT32_MAX;
 
          //Initialize Diffie-Hellman context
          ikeInitDhContext(sa);
@@ -326,6 +329,15 @@ void ikeDeleteSaEntry(IkeSaEntry *sa)
             ikeDeleteChildSaEntry(childSa);
          }
       }
+   }
+
+   //Check whether reauthentication is on-going
+   if(sa->oldSa != NULL && sa->oldSa->state != IKE_SA_STATE_CLOSED)
+   {
+      //Close the old IKE SA since reauthentication has failed
+      sa->oldSa->deleteRequest = TRUE;
+      //Notify the IKE context that the IKE SA should be closed
+      osSetEvent(&context->event);
    }
 
    //Mark the IKE SA as closed
@@ -523,8 +535,7 @@ error_t ikeGenerateSaSpi(IkeSaEntry *sa, uint8_t *spi)
    IkeSaEntry *entry;
 
    //Debug message
-   TRACE_INFO("Generating new IKE SA SPI (% " PRIuSIZE " bytes)...\r\n",
-      IKE_SPI_SIZE);
+   TRACE_INFO("Generating new IKE SA SPI (%u bytes)...\r\n", IKE_SPI_SIZE);
 
    //Point to the IKE context
    context = sa->context;
@@ -536,32 +547,46 @@ error_t ikeGenerateSaSpi(IkeSaEntry *sa, uint8_t *spi)
       //Generate an arbitrary 8-octet value
       error = context->prngAlgo->read(context->prngContext, spi, IKE_SPI_SIZE);
 
-      //Loop through IKE SA entries
-      for(i = 0; i < context->numSaEntries && !error; i++)
+      //Check status code
+      if(!error)
       {
-         //Point to the current IKE SA
-         entry = &context->sa[i];
-
-         //Check the state of the IKE SA
-         if(entry != sa && entry->state != IKE_SA_STATE_CLOSED)
+         //Non-zero SPI value?
+         if(osMemcmp(spi, IKE_INVALID_SPI, IKE_SPI_SIZE) != 0)
          {
-            //Check whether the entity is the original initiator of the IKE SA
-            if(entry->originalInitiator)
+            //Loop through IKE SA entries
+            for(i = 0; i < context->numSaEntries && !error; i++)
             {
-               //Test whether the SPI is a duplicate
-               if(osMemcmp(spi, entry->initiatorSpi, IKE_SPI_SIZE) == 0)
+               //Point to the current IKE SA
+               entry = &context->sa[i];
+
+               //Check the state of the IKE SA
+               if(entry != sa && entry->state != IKE_SA_STATE_CLOSED)
                {
-                  error = ERROR_INVALID_SPI;
+                  //Check whether the entity is the original initiator of the
+                  //IKE SA
+                  if(entry->originalInitiator)
+                  {
+                     //Test whether the SPI is a duplicate
+                     if(osMemcmp(spi, entry->initiatorSpi, IKE_SPI_SIZE) == 0)
+                     {
+                        error = ERROR_INVALID_SPI;
+                     }
+                  }
+                  else
+                  {
+                     //Test whether the SPI is a duplicate
+                     if(osMemcmp(spi, entry->responderSpi, IKE_SPI_SIZE) == 0)
+                     {
+                        error = ERROR_INVALID_SPI;
+                     }
+                  }
                }
             }
-            else
-            {
-               //Test whether the SPI is a duplicate
-               if(osMemcmp(spi, entry->responderSpi, IKE_SPI_SIZE) == 0)
-               {
-                  error = ERROR_INVALID_SPI;
-               }
-            }
+         }
+         else
+         {
+            //The SPI value must not be zero (refer to RFC 7296, section 3.1)
+            error = ERROR_INVALID_SPI;
          }
       }
 
@@ -595,8 +620,7 @@ error_t ikeGenerateChildSaSpi(IkeChildSaEntry *childSa, uint8_t *spi)
    IkeChildSaEntry *entry;
 
    //Debug message
-   TRACE_INFO("Generating new Child SA SPI (% " PRIuSIZE " bytes)...\r\n",
-      IKE_SPI_SIZE);
+   TRACE_INFO("Generating new Child SA SPI (%u bytes)...\r\n", IKE_SPI_SIZE);
 
    //Point to the IKE context
    context = childSa->context;
@@ -604,24 +628,38 @@ error_t ikeGenerateChildSaSpi(IkeChildSaEntry *childSa, uint8_t *spi)
    //Generate a unique SPI value
    do
    {
-      //Generate an arbitrary 8-octet value
+      //Generate an arbitrary 4-octet value
       error = context->prngAlgo->read(context->prngContext, spi,
          IPSEC_SPI_SIZE);
 
-      //Loop through Child SA entries
-      for(i = 0; i < context->numChildSaEntries && !error; i++)
+      //Check status code
+      if(!error)
       {
-         //Point to the current Child SA
-         entry = &context->childSa[i];
-
-         //Check the state of the Child SA
-         if(entry != childSa && entry->state != IKE_CHILD_SA_STATE_CLOSED)
+         //Non-zero SPI value?
+         if(osMemcmp(spi, IPSEC_INVALID_SPI, IPSEC_SPI_SIZE) != 0)
          {
-            //Test whether the SPI is a duplicate
-            if(osMemcmp(spi, entry->localSpi, IPSEC_SPI_SIZE) == 0)
+            //Loop through Child SA entries
+            for(i = 0; i < context->numChildSaEntries && !error; i++)
             {
-               error = ERROR_INVALID_SPI;
+               //Point to the current Child SA
+               entry = &context->childSa[i];
+
+               //Check the state of the Child SA
+               if(entry != childSa && entry->state != IKE_CHILD_SA_STATE_CLOSED)
+               {
+                  //Test whether the SPI is a duplicate
+                  if(osMemcmp(spi, entry->localSpi, IPSEC_SPI_SIZE) == 0)
+                  {
+                     error = ERROR_INVALID_SPI;
+                  }
+               }
             }
+         }
+         else
+         {
+            //The SPI value of zero is reserved and must not be sent on the
+            //wire (refer to RFC 4302, section 2.4 and RFC 4303, section 2.1)
+            error = ERROR_INVALID_SPI;
          }
       }
 
@@ -653,8 +691,7 @@ error_t ikeGenerateNonce(IkeContext *context, uint8_t *nonce, size_t *length)
    error_t error;
 
    //Debug message
-   TRACE_INFO("Generating new nonce (% " PRIuSIZE " bytes)...\r\n",
-      IKE_DEFAULT_NONCE_SIZE);
+   TRACE_INFO("Generating new nonce (%u bytes)...\r\n", IKE_DEFAULT_NONCE_SIZE);
 
    //Nonces used in IKEv2 must be randomly chosen and must be at least 128 bits
    //in size (refer to RFC 7296, section 2.10)
@@ -977,8 +1014,8 @@ error_t ikeCreateIpsecSaPair(IkeChildSaEntry *childSa)
 
    //Debug message
    TRACE_INFO("Creating IPsec SA pair...\r\n");
-   TRACE_INFO("  Outbound SPI = 0x%08X\r\n", LOAD32BE(childSa->remoteSpi));
-   TRACE_INFO("  Inbound SPI = 0x%08X\r\n", LOAD32BE(childSa->localSpi));
+   TRACE_INFO("  Outbound SPI = 0x%08" PRIX32 "\r\n", LOAD32BE(childSa->remoteSpi));
+   TRACE_INFO("  Inbound SPI = 0x%08" PRIX32 "\r\n", LOAD32BE(childSa->localSpi));
 
    //Set SAD entry parameters (outbound traffic)
    osMemset(&sadEntry, 0, sizeof(IpsecSadEntry));

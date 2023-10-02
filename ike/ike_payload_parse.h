@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 #ifndef _IKE_PAYLOAD_PARSE_H
@@ -40,7 +40,15 @@ extern "C" {
 #endif
 
 //IKE related functions
+error_t ikeParseSaPayload(const IkeSaPayload *saPayload);
+error_t ikeParseProposal(const IkeProposal *proposal, size_t length);
+error_t ikeParseTransform(const IkeTransform *transform, size_t length);
+
+error_t ikeParseTransformAttr(const IkeTransformAttr *attr, size_t length,
+   size_t *consumed);
+
 error_t ikeParseKePayload(IkeSaEntry *sa, const IkeKePayload *kePayload);
+
 error_t ikeParseIdPayload(IkeSaEntry *sa, const IkeIdPayload *idPayload);
 
 error_t ikeParseCertReqPayload(IkeSaEntry *sa,

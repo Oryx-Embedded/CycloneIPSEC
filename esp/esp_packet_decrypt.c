@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 //Switch to the appropriate trace level
@@ -33,6 +33,7 @@
 
 //Dependencies
 #include "ipsec/ipsec.h"
+#include "ipsec/ipsec_inbound.h"
 #include "esp/esp.h"
 #include "esp/esp_packet_decrypt.h"
 #include "cipher/cipher_algorithms.h"
@@ -174,10 +175,12 @@ error_t espDecryptPacket(IpsecContext *context, IpsecSadEntry *sa,
       //Two formats of the AAD are defined (refer to RFC 4309, section 5)
       if(sa->esn)
       {
+         //Reconstruct the 64-bit sequence number
+         uint64_t seq = ipsecGetSeqNum(sa, ntohl(espHeader->seqNum));
+
          //AAD Format with 64-bit sequence number
-         osMemcpy(aad, &espHeader->spi, 4);
-         osMemset(aad + 4, 0, 4);
-         osMemcpy(aad + 8, &espHeader->seqNum, 4);
+         osMemcpy(aad, (uint8_t *) &espHeader->spi, 4);
+         STORE64BE(seq, aad + 4);
          aadLen = 12;
       }
       else
@@ -220,10 +223,12 @@ error_t espDecryptPacket(IpsecContext *context, IpsecSadEntry *sa,
       //Two formats of the AAD are defined (refer to RFC 4106, section 5)
       if(sa->esn)
       {
+         //Reconstruct the 64-bit sequence number
+         uint64_t seq = ipsecGetSeqNum(sa, ntohl(espHeader->seqNum));
+
          //AAD Format with 64-bit sequence number
-         osMemcpy(aad, &espHeader->spi, 4);
-         osMemset(aad + 4, 0, 4);
-         osMemcpy(aad + 8, &espHeader->seqNum, 4);
+         osMemcpy(aad, (uint8_t *) &espHeader->spi, 4);
+         STORE64BE(seq, aad + 4);
          aadLen = 12;
       }
       else
@@ -270,12 +275,14 @@ error_t espDecryptPacket(IpsecContext *context, IpsecSadEntry *sa,
       //Extended sequence numbers?
       if(sa->esn)
       {
+         //Reconstruct the 64-bit sequence number
+         uint64_t seq = ipsecGetSeqNum(sa, ntohl(espHeader->seqNum));
+
          //For SAs with ESN, the AAD is 12 octets: a 4-octet SPI followed by an
          //8-octet sequence number as a 64-bit integer in big-endian byte order
          //(refer to RFC 7634, section 2.1)
-         osMemcpy(aad, &espHeader->spi, 4);
-         osMemset(aad + 4, 0, 4);
-         osMemcpy(aad + 8, &espHeader->seqNum, 4);
+         osMemcpy(aad, (uint8_t *) &espHeader->spi, 4);
+         STORE64BE(seq, aad + 4);
          aadLen = 12;
       }
       else
@@ -343,49 +350,11 @@ error_t espVerifyChecksum(IpsecContext *context, IpsecSadEntry *sa,
    const EspHeader *espHeader, const uint8_t *payload, size_t length,
    const uint8_t *icv)
 {
+   error_t error;
    size_t i;
    uint8_t mask;
-   error_t error;
    uint8_t checksum[MAX_HASH_DIGEST_SIZE];
 
-#if (ESP_CMAC_SUPPORT == ENABLED)
-   //CMAC integrity algorithm?
-   if(sa->authCipherAlgo != NULL)
-   {
-      CmacContext *cmacContext;
-
-      //Point to the CMAC context
-      cmacContext = &context->cmacContext;
-
-      //The SAD entry specifies the algorithms and keys to be employed for
-      //decryption and ICV computation (refer to RFC 4303, section 3.4.2)
-      error = cmacInit(cmacContext, sa->authCipherAlgo, sa->authKey,
-         sa->authKeyLen);
-
-      //Check status code
-      if(!error)
-      {
-         //The receiver computes the ICV over the ESP packet minus the ICV,
-         //using the specified integrity algorithm
-         cmacUpdate(cmacContext, espHeader, sizeof(EspHeader));
-         cmacUpdate(cmacContext, payload, length);
-
-         //Extended sequence number?
-         if(sa->esn)
-         {
-            //The high-order 32 bits are maintained as part of the sequence
-            //number counter by both transmitter and receiver and are included
-            //in the computation of the ICV (refer to RFC 4303, section 2.2.1)
-            uint32_t h = 0;
-            cmacUpdate(cmacContext, (uint8_t *) &h, 4);
-         }
-
-         //Finalize CMAC computation
-         cmacFinal(cmacContext, checksum, sa->icvLen);
-      }
-   }
-   else
-#endif
 #if (ESP_HMAC_SUPPORT == ENABLED)
    //HMAC integrity algorithm?
    if(sa->authHashAlgo != NULL)
@@ -411,15 +380,63 @@ error_t espVerifyChecksum(IpsecContext *context, IpsecSadEntry *sa,
          //Extended sequence number?
          if(sa->esn)
          {
+            //Determine the higher-order bits of the sequence number
+            uint32_t seqh = ipsecGetSeqNum(sa, ntohl(espHeader->seqNum)) >> 32;
+
+            //Convert the 32-bit value to network byte order
+            seqh = htonl(seqh);
+
             //The high-order 32 bits are maintained as part of the sequence
             //number counter by both transmitter and receiver and are included
             //in the computation of the ICV (refer to RFC 4303, section 2.2.1)
-            uint32_t h = 0;
-            hmacUpdate(hmacContext, (uint8_t *) &h, 4);
+            hmacUpdate(hmacContext, (uint8_t *) &seqh, 4);
          }
 
          //Finalize HMAC computation
          hmacFinal(hmacContext, checksum);
+      }
+   }
+   else
+#endif
+#if (ESP_CMAC_SUPPORT == ENABLED)
+   //CMAC integrity algorithm?
+   if(sa->authCipherAlgo != NULL)
+   {
+      CmacContext *cmacContext;
+
+      //Point to the CMAC context
+      cmacContext = &context->cmacContext;
+
+      //The SAD entry specifies the algorithms and keys to be employed for
+      //decryption and ICV computation (refer to RFC 4303, section 3.4.2)
+      error = cmacInit(cmacContext, sa->authCipherAlgo, sa->authKey,
+         sa->authKeyLen);
+
+      //Check status code
+      if(!error)
+      {
+         //The receiver computes the ICV over the ESP packet minus the ICV,
+         //using the specified integrity algorithm
+         cmacUpdate(cmacContext, espHeader, sizeof(EspHeader));
+         cmacUpdate(cmacContext, payload, length);
+
+         //Extended sequence number?
+         if(sa->esn)
+         {
+            //Determine the higher-order bits of the sequence number
+            uint32_t seqh = ipsecGetSeqNum(sa, ntohl(espHeader->seqNum)) >> 32;
+
+            //Convert the 32-bit value to network byte order
+            seqh = htonl(seqh);
+
+            //The high-order 32 bits are maintained as part of the sequence
+            //number counter by both transmitter and receiver and are included
+            //in the computation of the ICV (refer to RFC 4303, section 2.2.1)
+            cmacUpdate(cmacContext, (uint8_t *) &seqh, 4);
+         }
+
+         //Finalize CMAC computation
+         cmacFinal(cmacContext, checksum, sa->icvLen);
       }
    }
    else

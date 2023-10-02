@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 //Switch to the appropriate trace level
@@ -33,6 +33,7 @@
 
 //Dependencies
 #include "ipsec/ipsec.h"
+#include "ipsec/ipsec_inbound.h"
 #include "ipsec/ipsec_anti_replay.h"
 #include "ipsec/ipsec_misc.h"
 #include "esp/esp.h"
@@ -63,12 +64,14 @@ error_t ipv4ProcessEspHeader(NetInterface *interface,
 {
    error_t error;
    size_t length;
+   uint64_t seq;
    uint8_t nextHeader;
    size_t offset2;
    NetBuffer *buffer2;
    IpsecContext *context;
    IpsecSadEntry *sa;
    EspHeader *espHeader;
+   IpsecSelector selector;
    IpPseudoHeader pseudoHeader;
 
    //Point to the IPsec context
@@ -128,12 +131,17 @@ error_t ipv4ProcessEspHeader(NetInterface *interface,
       //of an IP datagram
    }
 
+   //Because only the low-order 32 bits are transmitted with the packet, the
+   //receiver must deduce and track the sequence number subspace into which
+   //each packet falls
+   seq = ipsecGetSeqNum(sa, ntohl(espHeader->seqNum));
+
    //For each received packet, the receiver must verify that the packet
    //contains a Sequence Number that does not duplicate the Sequence Number of
    //any other packets received during the life of this SA. This should be the
    //first ESP check applied to a packet after it has been matched to an SA, to
    //speed rejection of duplicate packets (refer to RFC 4303, section 3.4.3)
-   error = ipsecCheckReplayWindow(sa, ntohl(espHeader->seqNum));
+   error = ipsecCheckReplayWindow(sa, seq);
 
    //Duplicate packets are rejected
    if(error)
@@ -168,7 +176,7 @@ error_t ipv4ProcessEspHeader(NetInterface *interface,
    }
 
    //The receive window is updated only if the ICV verification succeeds
-   ipsecUpdateReplayWindow(sa, ntohl(espHeader->seqNum));
+   ipsecUpdateReplayWindow(sa, seq);
 
    //Allocate a buffer to hold the decrypted payload
    buffer2 = ipAllocBuffer(length, &offset2);
@@ -179,81 +187,102 @@ error_t ipv4ProcessEspHeader(NetInterface *interface,
    //Copy the resulting data
    netBufferWrite(buffer2, offset2, context->buffer, length);
 
-   //Form the IPv4 pseudo header
-   pseudoHeader.length = sizeof(Ipv4PseudoHeader);
-   pseudoHeader.ipv4Data.srcAddr = ipv4Header->srcAddr;
-   pseudoHeader.ipv4Data.destAddr = ipv4Header->destAddr;
-   pseudoHeader.ipv4Data.reserved = 0;
-   pseudoHeader.ipv4Data.protocol = nextHeader;
-   pseudoHeader.ipv4Data.length = htons(length);
+   //Retrieve packet's selector
+   error = ipsecGetInboundIpv4PacketSelector(ipv4Header, nextHeader, buffer2,
+      offset2, &selector);
 
-   //If the computed and received ICVs match, then the datagram is valid, and
-   //it is accepted (refer to RFC 4303, section 3.4.4.1)
-   switch(nextHeader)
+   //Check status code
+   if(!error)
    {
-   //ICMP protocol?
-   case IPV4_PROTOCOL_ICMP:
-      //Process incoming ICMP message
-      icmpProcessMessage(interface, &pseudoHeader.ipv4Data, buffer2, offset2);
+      //Match the packet against the inbound selectors identified by the SAD
+      //entry to verify that the received packet is appropriate for the SA via
+      //which it was received (refer to RFC 4301, section 5.2)
+      if(ipsecIsSubsetSelector(&selector, &sa->selector))
+      {
+         //Form the IPv4 pseudo header
+         pseudoHeader.length = sizeof(Ipv4PseudoHeader);
+         pseudoHeader.ipv4Data.srcAddr = ipv4Header->srcAddr;
+         pseudoHeader.ipv4Data.destAddr = ipv4Header->destAddr;
+         pseudoHeader.ipv4Data.reserved = 0;
+         pseudoHeader.ipv4Data.protocol = nextHeader;
+         pseudoHeader.ipv4Data.length = htons(length);
+
+         //If the computed and received ICVs match, then the datagram is valid,
+         //and it is accepted (refer to RFC 4303, section 3.4.4.1)
+         switch(nextHeader)
+         {
+         //ICMP protocol?
+         case IPV4_PROTOCOL_ICMP:
+            //Process incoming ICMP message
+            icmpProcessMessage(interface, &pseudoHeader.ipv4Data, buffer2,
+               offset2);
 
 #if (RAW_SOCKET_SUPPORT == ENABLED)
-      //Allow raw sockets to process ICMP messages
-      rawSocketProcessIpPacket(interface, &pseudoHeader, buffer2, offset2,
-         ancillary);
+            //Allow raw sockets to process ICMP messages
+            rawSocketProcessIpPacket(interface, &pseudoHeader, buffer2,
+               offset2, ancillary);
 #endif
-
-      //Continue processing
-      break;
+            //Continue processing
+            break;
 
 #if (IGMP_HOST_SUPPORT == ENABLED || IGMP_ROUTER_SUPPORT == ENABLED || \
    IGMP_SNOOPING_SUPPORT == ENABLED)
-   //IGMP protocol?
-   case IPV4_PROTOCOL_IGMP:
-      //Process incoming IGMP message
-      igmpProcessMessage(interface, &pseudoHeader.ipv4Data, buffer2, offset2,
-         ancillary);
+         //IGMP protocol?
+         case IPV4_PROTOCOL_IGMP:
+            //Process incoming IGMP message
+            igmpProcessMessage(interface, &pseudoHeader.ipv4Data, buffer2,
+               offset2, ancillary);
 
 #if (RAW_SOCKET_SUPPORT == ENABLED)
-      //Allow raw sockets to process IGMP messages
-      rawSocketProcessIpPacket(interface, &pseudoHeader, buffer2, offset2,
-         ancillary);
+            //Allow raw sockets to process IGMP messages
+            rawSocketProcessIpPacket(interface, &pseudoHeader, buffer2,
+               offset2, ancillary);
 #endif
-
-      //Continue processing
-      break;
+            //Continue processing
+            break;
 #endif
 
 #if (TCP_SUPPORT == ENABLED)
-   //TCP protocol?
-   case IPV4_PROTOCOL_TCP:
-      //Process incoming TCP segment
-      tcpProcessSegment(interface, &pseudoHeader, buffer2, offset2, ancillary);
-      //Continue processing
-      break;
+         //TCP protocol?
+         case IPV4_PROTOCOL_TCP:
+            //Process incoming TCP segment
+            tcpProcessSegment(interface, &pseudoHeader, buffer2, offset2,
+               ancillary);
+            //Continue processing
+            break;
 #endif
 
 #if (UDP_SUPPORT == ENABLED)
-   //UDP protocol?
-   case IPV4_PROTOCOL_UDP:
-      //Process incoming UDP datagram
-      error = udpProcessDatagram(interface, &pseudoHeader, buffer2, offset2,
-         ancillary);
-      //Continue processing
-      break;
+         //UDP protocol?
+         case IPV4_PROTOCOL_UDP:
+            //Process incoming UDP datagram
+            error = udpProcessDatagram(interface, &pseudoHeader, buffer2, offset2,
+               ancillary);
+            //Continue processing
+            break;
 #endif
 
-   //Unknown protocol?
-   default:
+         //Unknown protocol?
+         default:
 #if (RAW_SOCKET_SUPPORT == ENABLED)
-      //Allow raw sockets to process IPv4 packets
-      error = rawSocketProcessIpPacket(interface, &pseudoHeader, buffer2, offset2,
-         ancillary);
+            //Allow raw sockets to process IPv4 packets
+            error = rawSocketProcessIpPacket(interface, &pseudoHeader, buffer2,
+               offset2, ancillary);
 #else
-      //Report an error
-      error = ERROR_PROTOCOL_UNREACHABLE;
+            //Report an error
+            error = ERROR_PROTOCOL_UNREACHABLE;
 #endif
-      //Continue processing
-      break;
+            //Continue processing
+            break;
+         }
+      }
+      else
+      {
+         //If an IPsec system receives an inbound packet on an SA and the
+         //packet's header fields are not consistent with the selectors for
+         //the SA, it must discard the packet. This is an auditable event
+         error = ERROR_POLICY_FAILURE;
+      }
    }
 
    //Free previously allocated memory

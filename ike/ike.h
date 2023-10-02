@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 #ifndef _IKE_H
@@ -136,7 +136,7 @@
 
 //Initial retransmission timeout
 #ifndef IKE_INIT_TIMEOUT
-   #define IKE_INIT_TIMEOUT 1000
+   #define IKE_INIT_TIMEOUT 3000
 #elif (IKE_INIT_TIMEOUT < 1000)
    #error IKE_INIT_TIMEOUT parameter is not valid
 #endif
@@ -302,6 +302,13 @@
    #error IKE_HMAC_AUTH_SUPPORT parameter is not valid
 #endif
 
+//XCBC-MAC integrity support
+#ifndef IKE_XCBC_MAC_AUTH_SUPPORT
+   #define IKE_XCBC_MAC_AUTH_SUPPORT DISABLED
+#elif (IKE_XCBC_MAC_AUTH_SUPPORT != ENABLED && IKE_XCBC_MAC_AUTH_SUPPORT != DISABLED)
+   #error IKE_XCBC_MAC_AUTH_SUPPORT parameter is not valid
+#endif
+
 //CMAC PRF support
 #ifndef IKE_CMAC_PRF_SUPPORT
    #define IKE_CMAC_PRF_SUPPORT DISABLED
@@ -314,6 +321,13 @@
    #define IKE_HMAC_PRF_SUPPORT ENABLED
 #elif (IKE_HMAC_PRF_SUPPORT != ENABLED && IKE_HMAC_PRF_SUPPORT != DISABLED)
    #error IKE_HMAC_PRF_SUPPORT parameter is not valid
+#endif
+
+//XCBC-MAC PRF support
+#ifndef IKE_XCBC_MAC_PRF_SUPPORT
+   #define IKE_XCBC_MAC_PRF_SUPPORT DISABLED
+#elif (IKE_XCBC_MAC_PRF_SUPPORT != ENABLED && IKE_XCBC_MAC_PRF_SUPPORT != DISABLED)
+   #error IKE_XCBC_MAC_PRF_SUPPORT parameter is not valid
 #endif
 
 //IDEA cipher support (insecure)
@@ -629,7 +643,7 @@
 
 //Maximum shared secret length (ECDH key exchange)
 #if (IKE_ECDH_KE_SUPPORT == ENABLED && IKE_ECP_521_SUPPORT == ENABLED)
-   #define IKE_MAX_ECDH_SHARED_SECRET_LEN 64
+   #define IKE_MAX_ECDH_SHARED_SECRET_LEN 66
 #elif (IKE_ECDH_KE_SUPPORT == ENABLED && IKE_CURVE448_SUPPORT == ENABLED)
    #define IKE_MAX_ECDH_SHARED_SECRET_LEN 56
 #elif (IKE_ECDH_KE_SUPPORT == ENABLED && IKE_ECP_384_SUPPORT == ENABLED)
@@ -998,7 +1012,7 @@ typedef enum
    IKE_NOTIFY_MSG_TYPE_INVALID_SPI                         = 11,    //RFC 7296
    IKE_NOTIFY_MSG_TYPE_NO_PROPOSAL_CHOSEN                  = 14,    //RFC 7296
    IKE_NOTIFY_MSG_TYPE_INVALID_KE_PAYLOAD                  = 17,    //RFC 7296
-   IKE_NOTIFY_MSG_TYPE_AUTHENTICATION_FAILED               = 24,    //RFC 7296
+   IKE_NOTIFY_MSG_TYPE_AUTH_FAILED                         = 24,    //RFC 7296
    IKE_NOTIFY_MSG_TYPE_SINGLE_PAIR_REQUIRED                = 34,    //RFC 7296
    IKE_NOTIFY_MSG_TYPE_NO_ADDITIONAL_SAS                   = 35,    //RFC 7296
    IKE_NOTIFY_MSG_TYPE_INTERNAL_ADDRESS_FAILURE            = 36,    //RFC 7296
@@ -1840,6 +1854,9 @@ struct _IkeContext
 #endif
 #if (IKE_HMAC_AUTH_SUPPORT == ENABLED || IKE_HMAC_PRF_SUPPORT == ENABLED)
    HmacContext hmacContext;               ///<HMAC context
+#endif
+#if (IKE_XCBC_MAC_AUTH_SUPPORT == ENABLED || IKE_XCBC_MAC_PRF_SUPPORT == ENABLED)
+   XcbcMacContext xcbcMacContext;         ///<XCBC-MAC context
 #endif
 
 #if (IKE_COOKIE_SUPPORT == ENABLED)

@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 #ifndef _IPSEC_OUTBOUND_H
@@ -43,6 +43,13 @@ extern "C" {
 error_t ipsecProcessOutboundIpv4Packet(NetInterface *interface,
    const Ipv4PseudoHeader *pseudoHeader, uint16_t fragId, NetBuffer *buffer,
    size_t offset, NetTxAncillary *ancillary);
+
+error_t ipsecGetOutboundIpv4PacketSelector(const Ipv4PseudoHeader *pseudoHeader,
+   const NetBuffer *buffer, size_t offset, IpsecSelector *selector);
+
+error_t ipsecProtectIpv4Packet(IpsecContext *context, IpsecSadEntry *sa,
+   NetInterface *interface, const Ipv4PseudoHeader *pseudoHeader,
+   uint16_t fragId, NetBuffer *buffer, size_t offset, NetTxAncillary *ancillary);
 
 error_t ipsecSendIpv4Packet(NetInterface *interface,
    const Ipv4PseudoHeader *pseudoHeader, uint16_t fragId, NetBuffer *buffer,

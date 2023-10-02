@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 #ifndef _IKE_ALGORITHMS_H
@@ -119,7 +119,7 @@ const EcCurveInfo *ikeGetEcdhCurveInfo(uint16_t groupNum);
 error_t ikeLoadEcdhParams(EcDomainParameters *params, uint16_t groupNum);
 
 uint16_t ikeSelectDefaultDhGroup(void);
-bool_t ikeIsDhGroupSupported(uint16_t dhGroupNum);
+bool_t ikeIsDhGroupSupported(uint16_t groupNum);
 
 bool_t ikeIsHashAlgoSupported(uint16_t hashAlgoId);
 

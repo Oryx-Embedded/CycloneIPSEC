@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 //Switch to the appropriate trace level
@@ -33,6 +33,7 @@
 
 //Dependencies
 #include "ipsec/ipsec.h"
+#include "ipsec/ipsec_misc.h"
 #include "ah/ah.h"
 #include "ah/ah_algorithms.h"
 #include "ike/ike_algorithms.h"
@@ -97,17 +98,6 @@ error_t ahSelectAuthAlgo(IkeChildSaEntry *childSa, uint16_t authAlgoId)
    //Initialize status code
    error = NO_ERROR;
 
-#if (AH_CMAC_SUPPORT == ENABLED && AH_AES_128_SUPPORT == ENABLED)
-   //AES-CMAC-96 authentication algorithm?
-   if(authAlgoId == IKE_TRANSFORM_ID_AUTH_AES_CMAC_96)
-   {
-      childSa->authHashAlgo = NULL;
-      childSa->authCipherAlgo = AES_CIPHER_ALGO;
-      childSa->authKeyLen = 16;
-      childSa->icvLen = 12;
-   }
-   else
-#endif
 #if (AH_HMAC_SUPPORT == ENABLED && AH_MD5_SUPPORT == ENABLED)
    //HMAC-MD5-96 authentication algorithm?
    if(authAlgoId == IKE_TRANSFORM_ID_AUTH_HMAC_MD5_96)
@@ -160,6 +150,17 @@ error_t ahSelectAuthAlgo(IkeChildSaEntry *childSa, uint16_t authAlgoId)
       childSa->authCipherAlgo = NULL;
       childSa->authKeyLen = SHA512_DIGEST_SIZE;
       childSa->icvLen = 32;
+   }
+   else
+#endif
+#if (AH_CMAC_SUPPORT == ENABLED && AH_AES_128_SUPPORT == ENABLED)
+   //AES-CMAC-96 authentication algorithm?
+   if(authAlgoId == IKE_TRANSFORM_ID_AUTH_AES_CMAC_96)
+   {
+      childSa->authHashAlgo = NULL;
+      childSa->authCipherAlgo = AES_CIPHER_ALGO;
+      childSa->authKeyLen = 16;
+      childSa->icvLen = 12;
    }
    else
 #endif
@@ -363,29 +364,34 @@ error_t ahSelectSaProposal(IkeChildSaEntry *childSa, const IkeSaPayload *payload
       }
 
       //Check protocol identifier
-      if(proposal->protocolId == IKE_PROTOCOL_ID_AH &&
-         proposal->spiSize == 4)
+      if(proposal->protocolId == IKE_PROTOCOL_ID_AH)
       {
-         //Integrity transform negotiation
-         childSa->authAlgoId = ahSelectAuthTransform(childSa->context,
-            proposal, n);
-
-         //ESN transform negotiation
-         childSa->esn = ahSelectEsnTransform(childSa->context, proposal, n);
-
-         //Valid proposal?
-         if(childSa->authAlgoId != IKE_TRANSFORM_ID_INVALID &&
-            childSa->esn != IKE_TRANSFORM_ID_INVALID)
+         //Valid SPI value?
+         if(proposal->spiSize == IPSEC_SPI_SIZE &&
+            osMemcmp(proposal->spi, IPSEC_INVALID_SPI, IPSEC_SPI_SIZE) != 0)
          {
-            //Select AH security protocol
-            childSa->protocol = IPSEC_PROTOCOL_AH;
+            //Integrity transform negotiation
+            childSa->authAlgoId = ahSelectAuthTransform(childSa->context,
+               proposal, n);
 
-            //The initiator SPI is supplied in the SPI field of the SA payload
-            osMemcpy(childSa->remoteSpi, proposal->spi, proposal->spiSize);
+            //ESN transform negotiation
+            childSa->esn = ahSelectEsnTransform(childSa->context, proposal, n);
 
-            //Successful negotiation
-            error = NO_ERROR;
-            break;
+            //Valid proposal?
+            if(childSa->authAlgoId != IKE_TRANSFORM_ID_INVALID &&
+               childSa->esn != IKE_TRANSFORM_ID_INVALID)
+            {
+               //Select AH security protocol
+               childSa->protocol = IPSEC_PROTOCOL_AH;
+
+               //The initiator SPI is supplied in the SPI field of the SA
+               //payload
+               osMemcpy(childSa->remoteSpi, proposal->spi, proposal->spiSize);
+
+               //Successful negotiation
+               error = NO_ERROR;
+               break;
+            }
          }
       }
 
@@ -453,7 +459,12 @@ error_t ahCheckSaProposal(IkeChildSaEntry *childSa, const IkeSaPayload *payload)
 
    //During subsequent negotiations, the SPI Size field is equal to the size,
    //in octets, of the SPI of the corresponding protocol (4 for ESP and AH)
-   if(proposal->spiSize != 4)
+   if(proposal->spiSize != IPSEC_SPI_SIZE)
+      return ERROR_INVALID_MESSAGE;
+
+   //The SPI value of zero is reserved and must not be sent on the wire (refer
+   //to RFC 4302, section 2.4)
+   if(osMemcmp(proposal->spi, IPSEC_INVALID_SPI, IPSEC_SPI_SIZE) == 0)
       return ERROR_INVALID_MESSAGE;
 
    //The responder SPI is supplied in the SPI field of the SA payload

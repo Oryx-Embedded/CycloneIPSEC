@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 //Switch to the appropriate trace level
@@ -299,7 +299,7 @@ error_t ikeFormatChildSaProposal(IkeChildSaEntry *childSa,
    {
 #if (AH_SUPPORT == ENABLED)
       //AH protocol identifier?
-      if(protocolId == IKE_PROTOCOL_ID_AH)
+      if(protocolId == IPSEC_PROTOCOL_AH)
       {
          //AH generally has two transforms: ESN and an integrity check
          //algorithm
@@ -312,7 +312,7 @@ error_t ikeFormatChildSaProposal(IkeChildSaEntry *childSa,
 #endif
 #if (ESP_SUPPORT == ENABLED)
       //ESP protocol identifier?
-      if(protocolId == IKE_PROTOCOL_ID_ESP)
+      if(protocolId == IPSEC_PROTOCOL_ESP)
       {
          //ESP generally has three transforms: ESN, an encryption algorithm
          //and an integrity check algorithm
@@ -333,7 +333,7 @@ error_t ikeFormatChildSaProposal(IkeChildSaEntry *childSa,
    {
 #if (AH_SUPPORT == ENABLED)
       //AH protocol identifier?
-      if(protocolId == IKE_PROTOCOL_ID_AH)
+      if(protocolId == IPSEC_PROTOCOL_AH)
       {
          //The accepted proposal contains a single integrity transform
          error = ikeAddTransform(IKE_TRANSFORM_TYPE_INTEG,
@@ -353,7 +353,7 @@ error_t ikeFormatChildSaProposal(IkeChildSaEntry *childSa,
 #endif
 #if (ESP_SUPPORT == ENABLED)
       //ESP protocol identifier?
-      if(protocolId == IKE_PROTOCOL_ID_ESP)
+      if(protocolId == IPSEC_PROTOCOL_ESP)
       {
          //The accepted proposal contains a single encryption transform
          error = ikeAddTransform(IKE_TRANSFORM_TYPE_ENCR, childSa->encAlgoId,
@@ -436,6 +436,10 @@ error_t ikeFormatKePayload(IkeSaEntry *sa, uint8_t *p, size_t *written,
    //which the Key Exchange Data was computed
    kePayload->dhGroupNum = htons(sa->dhGroupNum);
 
+   //For forward compatibility, all fields marked RESERVED must be set to
+   //zero (refer to RFC 7296, section 2.5)
+   kePayload->reserved = 0;
+
    //A Key Exchange payload is constructed by copying one's Diffie-Hellman
    //public value into the Key Exchange Data portion of the payload
    error = ikeFormatDhPublicKey(sa, kePayload->keyExchangeData, &n);
@@ -495,6 +499,9 @@ error_t ikeFormatIdPayload(IkeSaEntry *sa, uint8_t *p, size_t *written,
    idPayload->header.nextPayload = IKE_PAYLOAD_TYPE_LAST;
    idPayload->header.critical = FALSE;
    idPayload->header.reserved = 0;
+
+   //For forward compatibility, all fields marked RESERVED must be set to
+   //zero (refer to RFC 7296, section 2.5)
    osMemset(idPayload->reserved, 0, 3);
 
    //Length of the payload header
@@ -834,6 +841,9 @@ error_t ikeFormatAuthPayload(IkeSaEntry *sa, const IkeIdPayload *idPayload,
    authPayload->header.nextPayload = IKE_PAYLOAD_TYPE_LAST;
    authPayload->header.critical = FALSE;
    authPayload->header.reserved = 0;
+
+   //For forward compatibility, all fields marked RESERVED must be set to
+   //zero (refer to RFC 7296, section 2.5)
    osMemset(authPayload->reserved, 0, 3);
 
    //Generate AUTH value

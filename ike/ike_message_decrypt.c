@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 //Switch to the appropriate trace level
@@ -359,9 +359,33 @@ error_t ikeVerifyChecksum(IkeSaEntry *sa, const uint8_t *message,
       authKey = sa->skai;
    }
 
+#if (IKE_HMAC_AUTH_SUPPORT == ENABLED)
+   //HMAC integrity algorithm?
+   if(sa->authHashAlgo != NULL)
+   {
+      HmacContext *hmacContext;
+
+      //Point to the HMAC context
+      hmacContext = &sa->context->hmacContext;
+
+      //Initialize HMAC calculation
+      error = hmacInit(hmacContext, sa->authHashAlgo, authKey, sa->authKeyLen);
+
+      //Check status code
+      if(!error)
+      {
+         //The checksum must be computed over the encrypted message. Its length
+         //is determined by the integrity algorithm negotiated
+         hmacUpdate(hmacContext, message, length);
+         hmacFinal(hmacContext, checksum);
+      }
+   }
+   else
+#endif
 #if (IKE_CMAC_AUTH_SUPPORT == ENABLED)
    //CMAC integrity algorithm?
-   if(sa->authCipherAlgo != NULL)
+   if(sa->authAlgoId == IKE_TRANSFORM_ID_AUTH_AES_CMAC_96 &&
+      sa->authCipherAlgo != NULL)
    {
       CmacContext *cmacContext;
 
@@ -383,25 +407,27 @@ error_t ikeVerifyChecksum(IkeSaEntry *sa, const uint8_t *message,
    }
    else
 #endif
-#if (IKE_HMAC_AUTH_SUPPORT == ENABLED)
-   //HMAC integrity algorithm?
-   if(sa->authHashAlgo != NULL)
+#if (IKE_XCBC_MAC_AUTH_SUPPORT == ENABLED)
+   //XCBC-MAC integrity algorithm?
+   if(sa->authAlgoId == IKE_TRANSFORM_ID_AUTH_AES_XCBC_96 &&
+      sa->authCipherAlgo != NULL)
    {
-      HmacContext *hmacContext;
+      XcbcMacContext *xcbcMacContext;
 
-      //Point to the HMAC context
-      hmacContext = &sa->context->hmacContext;
+      //Point to the XCBC-MAC context
+      xcbcMacContext = &sa->context->xcbcMacContext;
 
-      //Initialize HMAC calculation
-      error = hmacInit(hmacContext, sa->authHashAlgo, authKey, sa->authKeyLen);
+      //Initialize XCBC-MAC calculation
+      error = xcbcMacInit(xcbcMacContext, sa->authCipherAlgo, authKey,
+         sa->authKeyLen);
 
       //Check status code
       if(!error)
       {
          //The checksum must be computed over the encrypted message. Its length
          //is determined by the integrity algorithm negotiated
-         hmacUpdate(hmacContext, message, length);
-         hmacFinal(hmacContext, checksum);
+         xcbcMacUpdate(xcbcMacContext, message, length);
+         xcbcMacFinal(xcbcMacContext, checksum, sa->icvLen);
       }
    }
    else

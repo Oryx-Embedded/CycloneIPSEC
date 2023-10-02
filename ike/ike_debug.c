@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 //Switch to the appropriate trace level
@@ -277,7 +277,7 @@ static const IkeParamName ikeNotifyMsgTypeList[] =
    {IKE_NOTIFY_MSG_TYPE_INVALID_SPI,                         "INVALID_SPI"},
    {IKE_NOTIFY_MSG_TYPE_NO_PROPOSAL_CHOSEN,                  "NO_PROPOSAL_CHOSEN"},
    {IKE_NOTIFY_MSG_TYPE_INVALID_KE_PAYLOAD,                  "INVALID_KE_PAYLOAD"},
-   {IKE_NOTIFY_MSG_TYPE_AUTHENTICATION_FAILED,               "AUTHENTICATION_FAILED"},
+   {IKE_NOTIFY_MSG_TYPE_AUTH_FAILED,                         "AUTHENTICATION_FAILED"},
    {IKE_NOTIFY_MSG_TYPE_SINGLE_PAIR_REQUIRED,                "SINGLE_PAIR_REQUIRED"},
    {IKE_NOTIFY_MSG_TYPE_NO_ADDITIONAL_SAS,                   "NO_ADDITIONAL_SAS"},
    {IKE_NOTIFY_MSG_TYPE_INTERNAL_ADDRESS_FAILURE,            "INTERNAL_ADDRESS_FAILURE"},
@@ -883,7 +883,7 @@ void ikeDumpTransform(const IkeTransform *transform, size_t length)
       if(length < sizeof(IkeTransformAttr))
          break;
 
-      //Point to the Transform attribute
+      //Point to the transform attribute
       attr = (IkeTransformAttr *) p;
 
       //Debug message

@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 //Switch to the appropriate trace level
@@ -518,9 +518,22 @@ error_t ikeInitPrf(IkeSaEntry *sa, const uint8_t *vk, size_t vkLen)
 {
    error_t error;
 
+   //Initialize status code
+   error = NO_ERROR;
+
+#if (IKE_HMAC_PRF_SUPPORT == ENABLED)
+   //HMAC PRF algorithm?
+   if(sa->prfHashAlgo != NULL)
+   {
+      //Initialize HMAC calculation
+      error = hmacInit(&sa->context->hmacContext, sa->prfHashAlgo, vk, vkLen);
+   }
+   else
+#endif
 #if (IKE_CMAC_PRF_SUPPORT == ENABLED)
    //CMAC PRF algorithm?
-   if(sa->prfCipherAlgo != NULL)
+   if(sa->prfAlgoId == IKE_TRANSFORM_ID_PRF_AES128_CMAC &&
+      sa->prfCipherAlgo != NULL)
    {
       CmacContext *cmacContext;
       uint8_t k[16];
@@ -532,7 +545,7 @@ error_t ikeInitPrf(IkeSaEntry *sa, const uint8_t *vk, size_t vkLen)
       if(vkLen == 16)
       {
          //If the key VK is exactly 128 bits, then we use it as-is
-         error = cmacInit(cmacContext, sa->prfCipherAlgo, vk, vkLen);
+         osMemcpy(k, vk, vkLen);
       }
       else
       {
@@ -554,23 +567,68 @@ error_t ikeInitPrf(IkeSaEntry *sa, const uint8_t *vk, size_t vkLen)
             //Derive the 128-bit key K
             error = cmacFinal(cmacContext, k, 16);
          }
+      }
 
-         //Check status code
-         if(!error)
-         {
-            //We apply the AES-CMAC algorithm using K as the key
-            error = cmacInit(cmacContext, sa->prfCipherAlgo, k, 16);
-         }
+      //Check status code
+      if(!error)
+      {
+         //We apply the AES-CMAC algorithm using K as the key
+         error = cmacInit(cmacContext, sa->prfCipherAlgo, k, 16);
       }
    }
    else
 #endif
-#if (IKE_HMAC_PRF_SUPPORT == ENABLED)
-   //HMAC PRF algorithm?
-   if(sa->prfHashAlgo != NULL)
+#if (IKE_XCBC_MAC_PRF_SUPPORT == ENABLED)
+   //XCBC-MAC PRF algorithm?
+   if(sa->prfAlgoId == IKE_TRANSFORM_ID_PRF_AES128_XCBC &&
+      sa->prfCipherAlgo != NULL)
    {
-      //Initialize HMAC calculation
-      error = hmacInit(&sa->context->hmacContext, sa->prfHashAlgo, vk, vkLen);
+      XcbcMacContext *xcbcMacContext;
+      uint8_t k[16];
+
+      //Point to the XCBC-MAC context
+      xcbcMacContext = &sa->context->xcbcMacContext;
+
+      //Derive the 128-bit key K from the variable-length key VK
+      if(vkLen == 16)
+      {
+         //If the key is exactly 128 bits long, use it as-is
+         osMemcpy(k, vk, vkLen);
+      }
+      else if(vkLen < 16)
+      {
+         //If the key has fewer than 128 bits, lengthen it to exactly 128 bits
+         //by padding it on the right with zero bits
+         osMemcpy(k, vk, vkLen);
+         osMemset(k + vkLen, 0, 16 - vkLen);
+      }
+      else
+      {
+         //If the key is 129 bits or longer, shorten it to exactly 128 bits
+         //by performing the steps in AES-XCBC-PRF-128 (refer to RFC 4434,
+         //section 2)
+         osMemset(k, 0, 16);
+
+         //The key is 128 zero bits
+         error = xcbcMacInit(xcbcMacContext, sa->prfCipherAlgo, k, 16);
+
+         //Check status code
+         if(!error)
+         {
+            //The message is the too-long current key
+            xcbcMacUpdate(xcbcMacContext, vk, vkLen);
+
+            //Derive the 128-bit key K
+            error = xcbcMacFinal(xcbcMacContext, k, 16);
+         }
+      }
+
+      //Check status code
+      if(!error)
+      {
+         //We apply the XCBC-MAC algorithm using K as the key
+         error = xcbcMacInit(xcbcMacContext, sa->prfCipherAlgo, k, 16);
+      }
    }
    else
 #endif
@@ -594,21 +652,32 @@ error_t ikeInitPrf(IkeSaEntry *sa, const uint8_t *vk, size_t vkLen)
 
 void ikeUpdatePrf(IkeSaEntry *sa, const uint8_t *s, size_t sLen)
 {
-#if (IKE_CMAC_PRF_SUPPORT == ENABLED)
-   //CMAC PRF algorithm?
-   if(sa->prfCipherAlgo != NULL)
-   {
-      //Update CMAC calculation
-      cmacUpdate(&sa->context->cmacContext, s, sLen);
-   }
-   else
-#endif
 #if (IKE_HMAC_PRF_SUPPORT == ENABLED)
    //HMAC PRF algorithm?
    if(sa->prfHashAlgo != NULL)
    {
       //Update HMAC calculation
       hmacUpdate(&sa->context->hmacContext, s, sLen);
+   }
+   else
+#endif
+#if (IKE_CMAC_PRF_SUPPORT == ENABLED)
+   //CMAC PRF algorithm?
+   if(sa->prfAlgoId == IKE_TRANSFORM_ID_PRF_AES128_CMAC &&
+      sa->prfCipherAlgo != NULL)
+   {
+      //Update CMAC calculation
+      cmacUpdate(&sa->context->cmacContext, s, sLen);
+   }
+   else
+#endif
+#if (IKE_XCBC_MAC_PRF_SUPPORT == ENABLED)
+   //XCBC-MAC PRF algorithm?
+   if(sa->prfAlgoId == IKE_TRANSFORM_ID_PRF_AES128_XCBC &&
+      sa->prfCipherAlgo != NULL)
+   {
+      //Update XCBC-MAC calculation
+      xcbcMacUpdate(&sa->context->xcbcMacContext, s, sLen);
    }
    else
 #endif
@@ -633,21 +702,32 @@ error_t ikeFinalizePrf(IkeSaEntry *sa, uint8_t *output)
    //Initialize status code
    error = NO_ERROR;
 
-#if (IKE_CMAC_PRF_SUPPORT == ENABLED)
-   //CMAC PRF algorithm?
-   if(sa->prfCipherAlgo != NULL)
-   {
-      //Finalize CMAC calculation
-      error = cmacFinal(&sa->context->cmacContext, output, sa->prfKeyLen);
-   }
-   else
-#endif
 #if (IKE_HMAC_PRF_SUPPORT == ENABLED)
    //HMAC PRF algorithm?
    if(sa->prfHashAlgo != NULL)
    {
       //Finalize HMAC calculation
       hmacFinal(&sa->context->hmacContext, output);
+   }
+   else
+#endif
+#if (IKE_CMAC_PRF_SUPPORT == ENABLED)
+   //CMAC PRF algorithm?
+   if(sa->prfAlgoId == IKE_TRANSFORM_ID_PRF_AES128_CMAC &&
+      sa->prfCipherAlgo != NULL)
+   {
+      //Finalize CMAC calculation
+      error = cmacFinal(&sa->context->cmacContext, output, sa->prfKeyLen);
+   }
+   else
+#endif
+#if (IKE_XCBC_MAC_PRF_SUPPORT == ENABLED)
+   //XCBC-MAC PRF algorithm?
+   if(sa->prfAlgoId == IKE_TRANSFORM_ID_PRF_AES128_XCBC &&
+      sa->prfCipherAlgo != NULL)
+   {
+      //Finalize XCBC-MAC calculation
+      error = xcbcMacFinal(&sa->context->xcbcMacContext, output, sa->prfKeyLen);
    }
    else
 #endif

@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 //Switch to the appropriate trace level
@@ -169,8 +169,9 @@ void ikeProcessEvents(IkeContext *context)
          sa->state == IKE_SA_STATE_AUTH_RESP ||
          sa->state == IKE_SA_STATE_DPD_RESP ||
          sa->state == IKE_SA_STATE_REKEY_RESP ||
-         sa->state == IKE_SA_STATE_REKEY_CHILD_RESP ||
          sa->state == IKE_SA_STATE_DELETE_RESP ||
+         sa->state == IKE_SA_STATE_CREATE_CHILD_RESP ||
+         sa->state == IKE_SA_STATE_REKEY_CHILD_RESP ||
          sa->state == IKE_SA_STATE_DELETE_CHILD_RESP ||
          sa->state == IKE_SA_STATE_AUTH_FAILURE_RESP)
       {
@@ -244,7 +245,7 @@ error_t ikeProcessSaEvents(IkeSaEntry *sa)
    if(sa->state == IKE_SA_STATE_OPEN)
    {
       //Check whether the dead peer detection mechanism is enabled
-      if(sa->dpdPeriod > 0)
+      if(sa->dpdPeriod != 0)
       {
          //Check whether the DPD period has expired
          if(timeCompare(time, sa->dpdStart + sa->dpdPeriod) >= 0)
@@ -263,7 +264,7 @@ error_t ikeProcessSaEvents(IkeSaEntry *sa)
    if(sa->state == IKE_SA_STATE_OPEN && !error)
    {
       //Check whether reauthentication is enabled
-      if(sa->reauthPeriod > 0)
+      if(sa->reauthPeriod != 0)
       {
          //Reauthentication has to be initiated by the same party as the
          //original IKE SA. IKEv2 does not currently allow the responder to
@@ -334,39 +335,14 @@ error_t ikeProcessSaEvents(IkeSaEntry *sa)
 error_t ikeProcessChildSaEvents(IkeChildSaEntry *childSa)
 {
    error_t error;
-   systime_t time;
-   IkeContext *context;
    IkeSaEntry *sa;
 
    //Initialize status code
    error = NO_ERROR;
 
-   //Point to the IKE context
-   context = childSa->context;
    //Point to the IKE SA
    sa = childSa->sa;
 
-   //Get current time
-   time = osGetSystemTime();
-
-   //Check the state of the IKE SA
-   if(sa->state == IKE_SA_STATE_OPEN)
-   {
-      //Check whether the lifetime of the Child SA has expired
-      if(timeCompare(time, childSa->lifetimeStart + context->childSaLifetime) >= 0)
-      {
-         //Reestablishment of Security Associations to take the place of
-         //ones that expire is referred to as rekeying
-         childSa->rekeyRequest = TRUE;
-      }
-
-      //Check whether the Child SA should be rekeyed
-      if(childSa->rekeyRequest)
-      {
-         //Rekey the specified Child SA
-         error = ikeProcessChildSaRekeyEvent(childSa);
-      }
-   }
 
    //Check the state of the IKE SA
    if(sa->state == IKE_SA_STATE_OPEN && !error)
@@ -559,6 +535,9 @@ error_t ikeProcessSaReauthEvent(IkeSaEntry *sa)
    //Sanity check
    if(childSa != NULL)
    {
+      //Acknowledge request
+      sa->reauthPending = TRUE;
+
       //Create a new IKE SA
       newSa = ikeCreateSaEntry(context);
 
@@ -615,26 +594,44 @@ error_t ikeProcessSaReauthEvent(IkeSaEntry *sa)
             //Check status code
             if(!error)
             {
-               //Acknowledge request
-               sa->reauthPending = TRUE;
-
-               //Attach the old IKE SA
-               newSa->oldSa = sa;
-
                //The first exchange of an IKE session, IKE_SA_INIT, negotiates security
                //parameters for the IKE SA, sends nonces, and sends Diffie-Hellman values
                error = ikeSendIkeSaInitRequest(newSa);
+            }
+
+            //Check status code
+            if(!error)
+            {
+               //Attach the old IKE SA
+               newSa->oldSa = sa;
+            }
+            else
+            {
+               //Failed to initiate reauthentication
+               ikeDeleteSaEntry(newSa);
             }
          }
          else
          {
             //Failed to create Child SA
             ikeDeleteSaEntry(newSa);
+            //Report en error
+            error = ERROR_OUT_OF_RESOURCES;
          }
       }
       else
       {
          //Failed to create IKE SA
+         error = ERROR_OUT_OF_RESOURCES;
+      }
+
+      //Failed to initiate reauthentication?
+      if(error)
+      {
+         //Close the old IKE SA
+         sa->deleteRequest = TRUE;
+         //Notify the IKE context that the IKE SA should be closed
+         osSetEvent(&context->event);
       }
    }
 

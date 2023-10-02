@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 //Switch to the appropriate trace level
@@ -194,9 +194,8 @@ error_t espEncryptPacket(IpsecContext *context, IpsecSadEntry *sa,
       if(sa->esn)
       {
          //AAD Format with 64-bit sequence number
-         osMemcpy(aad, &espHeader->spi, 4);
-         osMemset(aad + 4, 0, 4);
-         osMemcpy(aad + 8, &espHeader->seqNum, 4);
+         osMemcpy(aad, (uint8_t *) &espHeader->spi, 4);
+         STORE64BE(sa->seqNum, aad + 4);
          aadLen = 12;
       }
       else
@@ -248,9 +247,8 @@ error_t espEncryptPacket(IpsecContext *context, IpsecSadEntry *sa,
       if(sa->esn)
       {
          //AAD Format with 64-bit sequence number
-         osMemcpy(aad, &espHeader->spi, 4);
-         osMemset(aad + 4, 0, 4);
-         osMemcpy(aad + 8, &espHeader->seqNum, 4);
+         osMemcpy(aad, (uint8_t *) &espHeader->spi, 4);
+         STORE64BE(sa->seqNum, aad + 4);
          aadLen = 12;
       }
       else
@@ -308,9 +306,8 @@ error_t espEncryptPacket(IpsecContext *context, IpsecSadEntry *sa,
          //For SAs with ESN, the AAD is 12 octets: a 4-octet SPI followed by an
          //8-octet sequence number as a 64-bit integer in big-endian byte order
          //(refer to RFC 7634, section 2.1)
-         osMemcpy(aad, &espHeader->spi, 4);
-         osMemset(aad + 4, 0, 4);
-         osMemcpy(aad + 8, &espHeader->seqNum, 4);
+         osMemcpy(aad, (uint8_t *) &espHeader->spi, 4);
+         STORE64BE(sa->seqNum, aad + 4);
          aadLen = 12;
       }
       else
@@ -362,43 +359,6 @@ error_t espComputeChecksum(IpsecContext *context, IpsecSadEntry *sa,
 {
    error_t error;
 
-#if (ESP_CMAC_SUPPORT == ENABLED)
-   //CMAC integrity algorithm?
-   if(sa->authCipherAlgo != NULL)
-   {
-      CmacContext *cmacContext;
-
-      //Point to the CMAC context
-      cmacContext = &context->cmacContext;
-
-      //The SAD entry specifies the algorithm employed for ICV computation
-      error = cmacInit(cmacContext, sa->authCipherAlgo, sa->authKey,
-         sa->authKeyLen);
-
-      //Check status code
-      if(!error)
-      {
-         //The checksum must be computed over the encrypted message. Its length
-         //is determined by the integrity algorithm negotiated
-         cmacUpdate(cmacContext, espHeader, sizeof(EspHeader));
-         cmacUpdate(cmacContext, payload, length);
-
-         //Extended sequence number?
-         if(sa->esn)
-         {
-            //The high-order 32 bits are maintained as part of the sequence
-            //number counter by both transmitter and receiver and are included
-            //in the computation of the ICV (refer to RFC 4303, section 2.2.1)
-            uint32_t h = 0;
-            cmacUpdate(cmacContext, (uint8_t *) &h, 4);
-         }
-
-         //Finalize CMAC computation
-         cmacFinal(cmacContext, icv, sa->icvLen);
-      }
-   }
-   else
-#endif
 #if (ESP_HMAC_SUPPORT == ENABLED)
    //HMAC integrity algorithm?
    if(sa->authHashAlgo != NULL)
@@ -426,7 +386,7 @@ error_t espComputeChecksum(IpsecContext *context, IpsecSadEntry *sa,
             //The high-order 32 bits are maintained as part of the sequence
             //number counter by both transmitter and receiver and are included
             //in the computation of the ICV (refer to RFC 4303, section 2.2.1)
-            uint32_t h = 0;
+            uint32_t h = htonl(sa->seqNum >> 32);
             hmacUpdate(hmacContext, (uint8_t *) &h, 4);
          }
 
@@ -435,6 +395,43 @@ error_t espComputeChecksum(IpsecContext *context, IpsecSadEntry *sa,
 
          //Copy the resulting checksum value
          osMemcpy(icv, hmacContext->digest, sa->icvLen);
+      }
+   }
+   else
+#endif
+#if (ESP_CMAC_SUPPORT == ENABLED)
+   //CMAC integrity algorithm?
+   if(sa->authCipherAlgo != NULL)
+   {
+      CmacContext *cmacContext;
+
+      //Point to the CMAC context
+      cmacContext = &context->cmacContext;
+
+      //The SAD entry specifies the algorithm employed for ICV computation
+      error = cmacInit(cmacContext, sa->authCipherAlgo, sa->authKey,
+         sa->authKeyLen);
+
+      //Check status code
+      if(!error)
+      {
+         //The checksum must be computed over the encrypted message. Its length
+         //is determined by the integrity algorithm negotiated
+         cmacUpdate(cmacContext, espHeader, sizeof(EspHeader));
+         cmacUpdate(cmacContext, payload, length);
+
+         //Extended sequence number?
+         if(sa->esn)
+         {
+            //The high-order 32 bits are maintained as part of the sequence
+            //number counter by both transmitter and receiver and are included
+            //in the computation of the ICV (refer to RFC 4303, section 2.2.1)
+            uint32_t h = htonl(sa->seqNum >> 32);
+            cmacUpdate(cmacContext, (uint8_t *) &h, 4);
+         }
+
+         //Finalize CMAC computation
+         cmacFinal(cmacContext, icv, sa->icvLen);
       }
    }
    else

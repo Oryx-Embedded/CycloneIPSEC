@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 //Switch to the appropriate trace level
@@ -47,6 +47,256 @@
 
 //Check IKEv2 library configuration
 #if (IKE_SUPPORT == ENABLED)
+
+
+/**
+ * @brief Parse Security Association payload
+ * @param[in] saPayload Pointer to the Security Association payload
+ * @return Error code
+ **/
+
+error_t ikeParseSaPayload(const IkeSaPayload *saPayload)
+{
+   error_t error;
+   size_t n;
+   size_t length;
+   const uint8_t *p;
+   const IkeProposal *proposal;
+
+   //Retrieve the length of the Security Association payload
+   length = ntohs(saPayload->header.payloadLength);
+
+   //Malformed Security Association payload?
+   if(length < sizeof(IkeSaPayload))
+      return ERROR_INVALID_SYNTAX;
+
+   //Point to the first byte of the Proposals field
+   p = saPayload->proposals;
+   //Determine the length of the Proposals field
+   length -= sizeof(IkeSaPayload);
+
+   //The SA payload must contain at least one Proposal substructure
+   if(length == 0)
+      return ERROR_INVALID_SYNTAX;
+
+   //Loop through the Proposal substructures
+   while(length > 0)
+   {
+      //Malformed payload?
+      if(length < sizeof(IkeProposal))
+      {
+         //Report an error
+         error = ERROR_INVALID_SYNTAX;
+         break;
+      }
+
+      //Point to the Proposal substructure
+      proposal = (IkeProposal *) p;
+
+      //The Proposal Length field indicates the length of this proposal,
+      //including all transforms and attributes that follow
+      n = ntohs(proposal->proposalLength);
+
+      //Check the length of the proposal
+      if(n < sizeof(IkeProposal) || n > length)
+      {
+         //Report an error
+         error = ERROR_INVALID_SYNTAX;
+         break;
+      }
+
+      //Parse Proposal substructure
+      error = ikeParseProposal(proposal, n);
+      //Any error to report?
+      if(error)
+         break;
+
+      //Jump to the next proposal
+      p += n;
+      length -= n;
+   }
+
+   //Return status code
+   return error;
+}
+
+
+/**
+ * @brief Parse Proposal substructure
+ * @param[in] proposal Pointer to the Proposal substructure
+ * @param[in] length Length of the Proposal substructure, in bytes
+ * @return Error code
+ **/
+
+error_t ikeParseProposal(const IkeProposal *proposal, size_t length)
+{
+   error_t error;
+   uint_t i;
+   size_t n;
+   const uint8_t *p;
+   const IkeTransform *transform;
+
+   //Check the length of the Proposal substructure
+   if(length < sizeof(IkeProposal))
+      return ERROR_INVALID_SYNTAX;
+
+   //Malformed substructure?
+   if(length < (sizeof(IkeProposal) + proposal->spiSize))
+      return ERROR_INVALID_SYNTAX;
+
+   //Get the length of the Proposal substructure
+   length = length - sizeof(IkeProposal) - proposal->spiSize;
+   //Point to the first Transform substructure
+   p = (uint8_t *) proposal + sizeof(IkeProposal) + proposal->spiSize;
+
+   //The Transforms field must contains at least one Transform substructure
+   if(proposal->numTransforms == 0)
+      return ERROR_INVALID_SYNTAX;
+
+   //Loop through the Transform substructures
+   for(i = 1; i <= proposal->numTransforms; i++)
+   {
+      //Malformed substructure?
+      if(length < sizeof(IkeTransform))
+      {
+         //Report an error
+         error = ERROR_INVALID_SYNTAX;
+         break;
+      }
+
+      //Point to the Transform substructure
+      transform = (IkeTransform *) p;
+
+      //The Transform Length field indicates the length of the Transform
+      //substructure including header and attributes
+      n = ntohs(transform->transformLength);
+
+      //Check the length of the transform
+      if(n < sizeof(IkeTransform) || n > length)
+      {
+         //Report an error
+         error = ERROR_INVALID_SYNTAX;
+         break;
+      }
+
+      //Parse Transform substructure
+      error = ikeParseTransform(transform, n);
+      //Any error to report?
+      if(error)
+         break;
+
+      //Jump to the next transform
+      p += n;
+      length -= n;
+   }
+
+   //Return status code
+   return error;
+}
+
+
+/**
+ * @brief Parse Transform substructure
+ * @param[in] transform Pointer to the Transform substructure
+ * @param[in] length Length of the Transform substructure, in bytes
+ * @return Error code
+ **/
+
+error_t ikeParseTransform(const IkeTransform *transform, size_t length)
+{
+   error_t error;
+   size_t n;
+   const uint8_t *p;
+   const IkeTransformAttr *attr;
+
+   //Check the length of the Transform substructure
+   if(length < sizeof(IkeTransform))
+      return ERROR_INVALID_SYNTAX;
+
+   //Point to the first byte of the Transform Attributes field
+   p = transform->transformAttr;
+   //Get the length of the Transform Attributes field
+   length -= sizeof(IkeTransform);
+
+   //The Transform Attributes field is optional
+   if(length > 0)
+   {
+      //The Transform Attributes field contains one or more attributes
+      while(length > 0)
+      {
+         //Malformed attribute?
+         if(length < sizeof(IkeTransformAttr))
+         {
+            //Report an error
+            error = ERROR_INVALID_SYNTAX;
+            break;
+         }
+
+         //Point to the transform attribute
+         attr = (IkeTransformAttr *) p;
+
+         //Parse transform attribute
+         error = ikeParseTransformAttr(attr, length, &n);
+         //Any error to report?
+         if(error)
+            break;
+
+         //Jump to the next attribute
+         p += n;
+         length -= n;
+      }
+   }
+   else
+   {
+      //The Transform Attributes field is not present
+      error = NO_ERROR;
+   }
+
+   //Return status code
+   return error;
+}
+
+
+/**
+ * @brief Parse transform attribute
+ * @param[in] attr Pointer to the transform attribute
+ * @param[in] length Number of bytes available in the input stream
+ * @param[out] consumed Total number of characters that have been consumed
+ * @return Error code
+ **/
+
+error_t ikeParseTransformAttr(const IkeTransformAttr *attr, size_t length,
+   size_t *consumed)
+{
+   size_t n;
+
+   //Malformed attribute?
+   if(length < sizeof(IkeTransformAttr))
+      return ERROR_INVALID_SYNTAX;
+
+   //Check the format of the attribute
+   if((ntohs(attr->type) & IKE_ATTR_FORMAT_TV) != 0)
+   {
+      //If the AF bit is set, then the attribute value has a fixed length
+      n = 0;
+   }
+   else
+   {
+      //If the AF bit is not set, then this attribute has a variable length
+      //defined by the Attribute Length field
+      n = ntohs(attr->length);
+
+      //Malformed attribute?
+      if(length < (sizeof(IkeTransformAttr) + n))
+         return ERROR_INVALID_SYNTAX;
+   }
+
+   //Total number of bytes that have been consumed
+   *consumed = sizeof(IkeTransformAttr) + n;
+
+   //Parsing was successful
+   return NO_ERROR;
+}
 
 
 /**

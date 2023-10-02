@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 //Switch to the appropriate trace level
@@ -33,6 +33,7 @@
 
 //Dependencies
 #include "ipsec/ipsec.h"
+#include "ipsec/ipsec_misc.h"
 #include "esp/esp.h"
 #include "esp/esp_algorithms.h"
 #include "ike/ike_algorithms.h"
@@ -826,17 +827,6 @@ error_t espSelectAuthAlgo(IkeChildSaEntry *childSa, uint16_t authAlgoId)
    //Initialize status code
    error = NO_ERROR;
 
-#if (ESP_CMAC_SUPPORT == ENABLED && ESP_AES_128_SUPPORT == ENABLED)
-   //AES-CMAC-96 authentication algorithm?
-   if(authAlgoId == IKE_TRANSFORM_ID_AUTH_AES_CMAC_96)
-   {
-      childSa->authHashAlgo = NULL;
-      childSa->authCipherAlgo = AES_CIPHER_ALGO;
-      childSa->authKeyLen = 16;
-      childSa->icvLen = 12;
-   }
-   else
-#endif
 #if (ESP_HMAC_SUPPORT == ENABLED && ESP_MD5_SUPPORT == ENABLED)
    //HMAC-MD5-96 authentication algorithm?
    if(authAlgoId == IKE_TRANSFORM_ID_AUTH_HMAC_MD5_96)
@@ -889,6 +879,17 @@ error_t espSelectAuthAlgo(IkeChildSaEntry *childSa, uint16_t authAlgoId)
       childSa->authCipherAlgo = NULL;
       childSa->authKeyLen = SHA512_DIGEST_SIZE;
       childSa->icvLen = 32;
+   }
+   else
+#endif
+#if (ESP_CMAC_SUPPORT == ENABLED && ESP_AES_128_SUPPORT == ENABLED)
+   //AES-CMAC-96 authentication algorithm?
+   if(authAlgoId == IKE_TRANSFORM_ID_AUTH_AES_CMAC_96)
+   {
+      childSa->authHashAlgo = NULL;
+      childSa->authCipherAlgo = AES_CIPHER_ALGO;
+      childSa->authKeyLen = 16;
+      childSa->icvLen = 12;
    }
    else
 #endif
@@ -1247,51 +1248,56 @@ error_t espSelectSaProposal(IkeChildSaEntry *childSa, const IkeSaPayload *payloa
       }
 
       //Check protocol identifier
-      if(proposal->protocolId == IKE_PROTOCOL_ID_ESP &&
-         proposal->spiSize == 4)
+      if(proposal->protocolId == IKE_PROTOCOL_ID_ESP)
       {
-         //Encryption transform negotiation
-         encAlgo = espSelectEncTransform(childSa->context, proposal, n);
-
-         //Valid encryption transform?
-         if(encAlgo != NULL)
+         //Valid SPI value?
+         if(proposal->spiSize == IPSEC_SPI_SIZE &&
+            osMemcmp(proposal->spi, IPSEC_INVALID_SPI, IPSEC_SPI_SIZE) != 0)
          {
-            childSa->encAlgoId = encAlgo->id;
-            childSa->encKeyLen = encAlgo->keyLen;
-         }
+            //Encryption transform negotiation
+            encAlgo = espSelectEncTransform(childSa->context, proposal, n);
 
-         //AEAD algorithm?
-         if(ikeIsAeadEncAlgo(childSa->encAlgoId))
-         {
-            //When an authenticated encryption algorithm is selected as the
-            //encryption algorithm for any SA, an integrity algorithm must not
-            //be selected for that SA (refer to RFC 5282, section 8)
-            childSa->authAlgoId = IKE_TRANSFORM_ID_AUTH_NONE;
-         }
-         else
-         {
-            //Integrity transform negotiation
-            childSa->authAlgoId = espSelectAuthTransform(childSa->context,
-               proposal, n);
-         }
+            //Valid encryption transform?
+            if(encAlgo != NULL)
+            {
+               childSa->encAlgoId = encAlgo->id;
+               childSa->encKeyLen = encAlgo->keyLen;
+            }
 
-         //ESN transform negotiation
-         childSa->esn = espSelectEsnTransform(childSa->context, proposal, n);
+            //AEAD algorithm?
+            if(ikeIsAeadEncAlgo(childSa->encAlgoId))
+            {
+               //When an authenticated encryption algorithm is selected as the
+               //encryption algorithm for any SA, an integrity algorithm must
+               //not be selected for that SA (refer to RFC 5282, section 8)
+               childSa->authAlgoId = IKE_TRANSFORM_ID_AUTH_NONE;
+            }
+            else
+            {
+               //Integrity transform negotiation
+               childSa->authAlgoId = espSelectAuthTransform(childSa->context,
+                  proposal, n);
+            }
 
-         //Valid proposal?
-         if(childSa->encAlgoId != IKE_TRANSFORM_ID_INVALID &&
-            childSa->authAlgoId != IKE_TRANSFORM_ID_INVALID &&
-            childSa->esn != IKE_TRANSFORM_ID_INVALID)
-         {
-            //Select ESP security protocol
-            childSa->protocol = IPSEC_PROTOCOL_ESP;
+            //ESN transform negotiation
+            childSa->esn = espSelectEsnTransform(childSa->context, proposal, n);
 
-            //The initiator SPI is supplied in the SPI field of the SA payload
-            osMemcpy(childSa->remoteSpi, proposal->spi, proposal->spiSize);
+            //Valid proposal?
+            if(childSa->encAlgoId != IKE_TRANSFORM_ID_INVALID &&
+               childSa->authAlgoId != IKE_TRANSFORM_ID_INVALID &&
+               childSa->esn != IKE_TRANSFORM_ID_INVALID)
+            {
+               //Select ESP security protocol
+               childSa->protocol = IPSEC_PROTOCOL_ESP;
 
-            //Successful negotiation
-            error = NO_ERROR;
-            break;
+               //The initiator SPI is supplied in the SPI field of the SA
+               //payload
+               osMemcpy(childSa->remoteSpi, proposal->spi, proposal->spiSize);
+
+               //Successful negotiation
+               error = NO_ERROR;
+               break;
+            }
          }
       }
 
@@ -1360,7 +1366,12 @@ error_t espCheckSaProposal(IkeChildSaEntry *childSa, const IkeSaPayload *payload
 
    //During subsequent negotiations, the SPI Size field is equal to the size,
    //in octets, of the SPI of the corresponding protocol (4 for ESP and AH)
-   if(proposal->spiSize != 4)
+   if(proposal->spiSize != IPSEC_SPI_SIZE)
+      return ERROR_INVALID_MESSAGE;
+
+   //The SPI value of zero is reserved and must not be sent on the wire (refer
+   //to RFC 4303, section 2.1)
+   if(osMemcmp(proposal->spi, IPSEC_INVALID_SPI, IPSEC_SPI_SIZE) == 0)
       return ERROR_INVALID_MESSAGE;
 
    //The responder SPI is supplied in the SPI field of the SA payload

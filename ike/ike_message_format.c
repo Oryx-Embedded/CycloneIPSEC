@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.0
+ * @version 2.3.2
  **/
 
 //Switch to the appropriate trace level
@@ -109,6 +109,9 @@ error_t ikeSendIkeSaInitResponse(IkeSaEntry *sa)
    error_t error;
    IkeContext *context;
 
+   //Initialize status code
+   error = NO_ERROR;
+
    //Point to the IKE context
    context = sa->context;
 
@@ -166,8 +169,12 @@ error_t ikeSendIkeSaInitResponse(IkeSaEntry *sa)
       osMemset(sa->responderSpi, 0, IKE_SPI_SIZE);
    }
 
-   //Format IKE_SA_INIT response
-   error = ikeFormatIkeSaInitResponse(sa, sa->response, &sa->responseLen);
+   //Check status code
+   if(!error)
+   {
+      //Format IKE_SA_INIT response
+      error = ikeFormatIkeSaInitResponse(sa, sa->response, &sa->responseLen);
+   }
 
    //Check status code
    if(!error)
@@ -367,16 +374,15 @@ error_t ikeSendIkeAuthResponse(IkeSaEntry *sa)
       socketSendTo(context->socket, &context->remoteIpAddr, context->remotePort,
          sa->response, sa->responseLen, NULL, 0);
 
-      //Only authentication failures and malformed messages lead to a deletion
-      //of the IKE SA without requiring an explicit INFORMATIONAL exchange
-      //carrying a Delete payload
-      if(sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_AUTHENTICATION_FAILED ||
-         sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_INVALID_SYNTAX)
-      {
-         //This error notification is considered fatal in both peers
-         error = ERROR_AUTHENTICATION_FAILED;
-      }
-      else
+      //If creating the Child SA during the IKE_AUTH exchange fails for some
+      //reason, the IKE SA is still created as usual (refer to RFC 7296,
+      //section 1.2)
+      if(sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_NONE ||
+         sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_NO_PROPOSAL_CHOSEN ||
+         sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_TS_UNACCEPTABLE ||
+         sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_SINGLE_PAIR_REQUIRED ||
+         sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_INTERNAL_ADDRESS_FAILURE ||
+         sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_FAILED_CP_REQUIRED)
       {
          //The responder has sent the IKE_AUTH response
          ikeChangeSaState(sa, IKE_SA_STATE_OPEN);
@@ -406,6 +412,18 @@ error_t ikeSendIkeAuthResponse(IkeSaEntry *sa)
             sa->initialContact = FALSE;
          }
 #endif
+      }
+      else if(sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_UNSUPPORTED_CRITICAL_PAYLOAD)
+      {
+         //An unsupported critical payload was included in the IKE_AUTH request
+      }
+      else
+      {
+         //Only authentication failures (AUTHENTICATION_FAILED) and malformed
+         //messages (INVALID_SYNTAX) lead to a deletion of the IKE SA without
+         //requiring an explicit INFORMATIONAL exchange carrying a Delete
+         //payload
+         error = ERROR_AUTHENTICATION_FAILED;
       }
    }
 
@@ -1128,9 +1146,11 @@ error_t ikeFormatIkeAuthResponse(IkeSaEntry *sa, uint8_t *p, size_t *length)
    //reason, the IKE SA is still created as usual (refer to RFC 7296,
    //section 1.2)
    if(sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_NONE ||
-      sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_TEMPORARY_FAILURE ||
       sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_NO_PROPOSAL_CHOSEN ||
-      sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_TS_UNACCEPTABLE)
+      sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_TS_UNACCEPTABLE ||
+      sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_SINGLE_PAIR_REQUIRED ||
+      sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_INTERNAL_ADDRESS_FAILURE ||
+      sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_FAILED_CP_REQUIRED)
    {
       //The responder asserts its identity with the IDr payload (refer to
       //RFC 7296, section 1.2)
@@ -1414,8 +1434,8 @@ error_t ikeFormatInformationalRequest(IkeSaEntry *sa, uint8_t *p,
       //(invalid shared secret, invalid ID, untrusted certificate issuer,
       //revoked or expired certificate, etc.) should result in an
       //AUTHENTICATION_FAILED notification
-      error = ikeFormatNotifyPayload(sa, NULL,
-         IKE_NOTIFY_MSG_TYPE_AUTHENTICATION_FAILED, p, &n, &nextPayload);
+      error = ikeFormatNotifyPayload(sa, NULL, IKE_NOTIFY_MSG_TYPE_AUTH_FAILED,
+         p, &n, &nextPayload);
       //Any error to report?
       if(error)
          return error;
