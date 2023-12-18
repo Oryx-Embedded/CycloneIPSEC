@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.2
+ * @version 2.3.4
  **/
 
 #ifndef _IKE_H
@@ -33,9 +33,8 @@
 
 //Dependencies
 #include "ipsec/ipsec.h"
-#include "pkc/dh.h"
-#include "ecc/ecdh.h"
 #include "cipher/cipher_algorithms.h"
+#include "pkc/key_exch_algorithms.h"
 #include "pkix/x509_common.h"
 
 //IKEv2 support
@@ -1236,8 +1235,10 @@ typedef enum
 } IkeCertType;
 
 
-//CodeWarrior or Win32 compiler?
-#if defined(__CWCC__) || defined(_WIN32)
+//CC-RX, CodeWarrior or Win32 compiler?
+#if defined(__CCRX__)
+   #pragma pack
+#elif defined(__CWCC__) || defined(_WIN32)
    #pragma pack(push, 1)
 #endif
 
@@ -1565,8 +1566,10 @@ typedef __packed_struct
 } IkeEncryptedFragPayload;
 
 
-//CodeWarrior or Win32 compiler?
-#if defined(__CWCC__) || defined(_WIN32)
+//CC-RX, CodeWarrior or Win32 compiler?
+#if defined(__CCRX__)
+   #pragma unpack
+#elif defined(__CWCC__) || defined(_WIN32)
    #pragma pack(pop)
 #endif
 
@@ -1779,6 +1782,7 @@ struct _IkeChildSaEntry
 
 typedef struct
 {
+   OsTaskParameters task;                            ///<Task parameters
    NetInterface *interface;                          ///<Underlying network interface
    const PrngAlgo *prngAlgo;                         ///<Pseudo-random number generator to be used
    void *prngContext;                                ///<Pseudo-random number generator context
@@ -1811,11 +1815,8 @@ struct _IkeContext
    bool_t running;                        ///<Operational state of IKEv2
    bool_t stop;                           ///<Stop request
    OsEvent event;                         ///<Event object used to poll the sockets
+   OsTaskParameters taskParams;           ///<Task parameters
    OsTaskId taskId;                       ///<Task identifier
-#if (OS_STATIC_TASK_SUPPORT == ENABLED)
-   OsTaskTcb taskTcb;                     ///<Task control block
-   OsStackType taskStack[IKE_STACK_SIZE]; ///<Task stack
-#endif
    NetInterface *interface;               ///<Underlying network interface
    const PrngAlgo *prngAlgo;              ///<Pseudo-random number generator to be used
    void *prngContext;                     ///<Pseudo-random number generator context

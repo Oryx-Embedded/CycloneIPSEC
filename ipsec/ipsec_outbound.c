@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.2
+ * @version 2.3.4
  **/
 
 //Dependencies
@@ -462,14 +462,23 @@ error_t ipsecSendIpv4Packet(NetInterface *interface,
    else
    {
 #if (IPV4_FRAG_SUPPORT == ENABLED)
-      //If the payload length exceeds the network interface MTU then the
-      //device must fragment the data
-      error = ipv4FragmentDatagram(interface, pseudoHeader, fragId, buffer,
-         offset, ancillary);
-#else
-      //Fragmentation is not supported
-      error = ERROR_MESSAGE_TOO_LONG;
+      //An IP datagram can be marked "don't fragment". Any IP datagram so
+      //marked is not to be fragmented under any circumstances (refer to
+      //RFC791, section 2.3)
+      if(!ancillary->dontFrag)
+      {
+         //If the payload length exceeds the network interface MTU then the
+         //device must fragment the data
+         error = ipv4FragmentDatagram(interface, pseudoHeader, fragId, buffer,
+            offset, ancillary);
+      }
+      else
 #endif
+      {
+         //If IP datagram cannot be delivered to its destination without
+         //fragmenting it, it is to be discarded instead
+         error = ERROR_MESSAGE_TOO_LONG;
+      }
    }
 
    //Return status code

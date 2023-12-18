@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.2
+ * @version 2.3.4
  **/
 
 //Dependencies
@@ -224,39 +224,49 @@ uint64_t ipsecGetSeqNum(IpsecSadEntry *sa, uint32_t seql)
    uint32_t th;
    uint32_t seqh;
 
-   //The upper bound of window represents the highest sequence number
-   //authenticated so far
-   tl = sa->seqNum & 0xFFFFFFFF;
-   th = (sa->seqNum >> 32) & 0xFFFFFFFF;
-
-   //Lower bound of window
-   bl = tl - IPSEC_ANTI_REPLAY_WINDOW_SIZE + 1;
-
-   //When performing the anti-replay check, or when determining which high-order
-   //bits to use to authenticate an incoming packet, there are two cases
-   if(tl >= (IPSEC_ANTI_REPLAY_WINDOW_SIZE - 1))
+   //Extended sequence numbers?
+   if(sa->esn)
    {
-      //In this case, the window is within one sequence number subspace
-      if(seql >= bl)
+      //The upper bound of window represents the highest sequence number
+      //authenticated so far
+      tl = sa->seqNum & 0xFFFFFFFF;
+      th = (sa->seqNum >> 32) & 0xFFFFFFFF;
+
+      //Lower bound of window
+      bl = tl - IPSEC_ANTI_REPLAY_WINDOW_SIZE + 1;
+
+      //When performing the anti-replay check, or when determining which
+      //high-order bits to use to authenticate an incoming packet, there are
+      //two cases
+      if(tl >= (IPSEC_ANTI_REPLAY_WINDOW_SIZE - 1))
       {
-         seqh = th;
+         //In this case, the window is within one sequence number subspace
+         if(seql >= bl)
+         {
+            seqh = th;
+         }
+         else
+         {
+            seqh = th + 1;
+         }
       }
       else
       {
-         seqh = th + 1;
+         //In this case, the window spans two sequence number subspaces
+         if(seql >= bl)
+         {
+            seqh = th - 1;
+         }
+         else
+         {
+            seqh = th;
+         }
       }
    }
    else
    {
-      //In this case, the window spans two sequence number subspaces
-      if(seql >= bl)
-      {
-         seqh = th - 1;
-      }
-      else
-      {
-         seqh = th;
-      }
+      //The sequence number is a 32-bit field
+      seqh = 0;
    }
 
    //Reconstruct the 64-bit sequence number
