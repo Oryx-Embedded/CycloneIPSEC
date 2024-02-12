@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2023 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.3.4
+ * @version 2.4.0
  **/
 
 //Switch to the appropriate trace level
@@ -54,7 +54,7 @@
  * @param[in] childSa Pointer to the Child SA
  * @param[out] p Buffer where to format the payload
  * @param[out] written Length of the resulting payload
- * @param[in,out] nextPayload Pointer to the the Next Payload field
+ * @param[in,out] nextPayload Pointer to the Next Payload field
  * @return Error code
  **/
 
@@ -410,7 +410,7 @@ error_t ikeFormatChildSaProposal(IkeChildSaEntry *childSa,
  * @param[in] sa Pointer to the IKE SA
  * @param[out] p Buffer where to format the payload
  * @param[out] written Length of the resulting payload
- * @param[in,out] nextPayload Pointer to the the Next Payload field
+ * @param[in,out] nextPayload Pointer to the Next Payload field
  * @return Error code
  **/
 
@@ -465,7 +465,7 @@ error_t ikeFormatKePayload(IkeSaEntry *sa, uint8_t *p, size_t *written,
  * @param[in] sa Pointer to the IKE SA
  * @param[out] p Buffer where to format the payload
  * @param[out] written Length of the resulting payload
- * @param[in,out] nextPayload Pointer to the the Next Payload field
+ * @param[in,out] nextPayload Pointer to the Next Payload field
  * @return Error code
  **/
 
@@ -568,7 +568,7 @@ error_t ikeFormatIdPayload(IkeSaEntry *sa, uint8_t *p, size_t *written,
  * @param[in] sa Pointer to the IKE SA
  * @param[out] p Buffer where to format the payloads
  * @param[out] written Length of the resulting payloads
- * @param[in,out] nextPayload Pointer to the the Next Payload field
+ * @param[in,out] nextPayload Pointer to the Next Payload field
  * @return Error code
  **/
 
@@ -661,7 +661,7 @@ error_t ikeFormatCertPayloads(IkeSaEntry *sa, uint8_t *p, size_t *written,
  * @param[out] consumed Total number of characters that have been consumed
  * @param[out] p Buffer where to format the payload
  * @param[out] written Length of the resulting payload
- * @param[in,out] nextPayload Pointer to the the Next Payload field
+ * @param[in,out] nextPayload Pointer to the Next Payload field
  * @return Error code
  **/
 
@@ -722,7 +722,7 @@ error_t ikeFormatCertPayload(const char_t *certChain, size_t certChainLen,
  * @param[in] sa Pointer to the IKE SA
  * @param[out] p Buffer where to format the payload
  * @param[out] written Length of the resulting payload
- * @param[in,out] nextPayload Pointer to the the Next Payload field
+ * @param[in,out] nextPayload Pointer to the Next Payload field
  * @return Error code
  **/
 
@@ -820,7 +820,7 @@ error_t ikeFormatCertReqPayload(IkeSaEntry *sa, uint8_t *p, size_t *written,
  * @param[in] idPayload Pointer to the Identification payload
  * @param[out] p Buffer where to format the payload
  * @param[out] written Length of the resulting payload
- * @param[in,out] nextPayload Pointer to the the Next Payload field
+ * @param[in,out] nextPayload Pointer to the Next Payload field
  * @return Error code
  **/
 
@@ -873,7 +873,7 @@ error_t ikeFormatAuthPayload(IkeSaEntry *sa, const IkeIdPayload *idPayload,
  * @param[in] childSa Pointer to the Child SA
  * @param[out] p Buffer where to format the payload
  * @param[out] written Length of the resulting payload
- * @param[in,out] nextPayload Pointer to the the Next Payload field
+ * @param[in,out] nextPayload Pointer to the Next Payload field
  * @return Error code
  **/
 
@@ -961,7 +961,7 @@ error_t ikeFormatNoncePayload(IkeSaEntry *sa, IkeChildSaEntry *childSa,
  * @param[in] notifyMsgType Type of notification
  * @param[out] p Buffer where to format the payload
  * @param[out] written Length of the resulting payload
- * @param[in,out] nextPayload Pointer to the the Next Payload field
+ * @param[in,out] nextPayload Pointer to the Next Payload field
  * @return Error code
  **/
 
@@ -1170,7 +1170,7 @@ error_t ikeFormatSignHashAlgosNotificationData(IkeSaEntry *sa, uint8_t *p,
  * @param[in] childSa Pointer to the Child SA
  * @param[out] p Buffer where to format the payload
  * @param[out] written Length of the resulting payload
- * @param[in,out] nextPayload Pointer to the the Next Payload field
+ * @param[in,out] nextPayload Pointer to the Next Payload field
  * @return Error code
  **/
 
@@ -1233,7 +1233,7 @@ error_t ikeFormatDeletePayload(IkeSaEntry *sa, IkeChildSaEntry *childSa,
  * @param[in] childSa Pointer to the Child SA
  * @param[out] p Buffer where to format the payload
  * @param[out] written Length of the resulting payload
- * @param[in,out] nextPayload Pointer to the the Next Payload field
+ * @param[in,out] nextPayload Pointer to the Next Payload field
  * @return Error code
  **/
 
@@ -1317,7 +1317,7 @@ error_t ikeFormatTsiPayload(IkeChildSaEntry *childSa, uint8_t *p,
  * @param[in] childSa Pointer to the Child SA
  * @param[out] p Buffer where to format the payload
  * @param[out] written Length of the resulting payload
- * @param[in,out] nextPayload Pointer to the the Next Payload field
+ * @param[in,out] nextPayload Pointer to the Next Payload field
  * @return Error code
  **/
 
