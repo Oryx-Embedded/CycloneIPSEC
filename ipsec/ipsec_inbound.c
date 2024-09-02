@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.2
+ * @version 2.4.4
  **/
 
 //Dependencies
@@ -145,7 +145,7 @@ error_t ipsecGetInboundIpv4PacketSelector(const Ipv4Header *ipv4Header,
    //Retrieve the length of the data
    length = netBufferGetLength(buffer) - offset;
    //Point to the data
-   data = netBufferAt(buffer, offset);
+   data = netBufferAt(buffer, offset, 0);
 
    //Sanity check
    if(data != NULL)

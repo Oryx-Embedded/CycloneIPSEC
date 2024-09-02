@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.2
+ * @version 2.4.4
  **/
 
 //Dependencies
@@ -177,7 +177,7 @@ error_t ipsecGetOutboundIpv4PacketSelector(const Ipv4PseudoHeader *pseudoHeader,
    //Retrieve the length of the data
    length = netBufferGetLength(buffer) - offset;
    //Point to the data
-   data = netBufferAt(buffer, offset);
+   data = netBufferAt(buffer, offset, 0);
 
    //Sanity check
    if(data != NULL)
@@ -289,7 +289,7 @@ error_t ipsecProtectIpv4Packet(IpsecContext *context, IpsecSadEntry *sa,
 
          //The AH header is inserted after the IP header and before a next
          //layer protocol
-         ahHeader = netBufferAt(buffer, offset);
+         ahHeader = netBufferAt(buffer, offset, 0);
 
          //The sender increments the sequence number counter for this SA and
          //inserts the low-order 32 bits of the value into the Sequence

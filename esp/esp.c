@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.2
+ * @version 2.4.4
  **/
 
 //Switch to the appropriate trace level
@@ -88,7 +88,7 @@ error_t ipv4ProcessEspHeader(NetInterface *interface,
       return ERROR_INVALID_HEADER;
 
    //Point to the ESP header
-   espHeader = netBufferAt(buffer, offset);
+   espHeader = netBufferAt(buffer, offset, 0);
    //Sanity check
    if(espHeader == NULL)
       return ERROR_FAILURE;

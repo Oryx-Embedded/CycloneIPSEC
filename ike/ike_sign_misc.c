@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.2
+ * @version 2.4.4
  **/
 
 //Switch to the appropriate trace level
@@ -853,15 +853,15 @@ const HashAlgo *ikeSelectSignHashAlgo(IkeSaEntry *sa,
  * @param[in] id MAC authentication data
  * @param[in] idLen MAC authentication data
  * @param[out] macId Temporary buffer needed to calculate MACedID
- * @param[out] messageChunks Collection of chunks representing the message to
- *   be signed
+ * @param[out] messageChunks Array of data chunks representing the message
+ *   to be signed
  * @param[in] initiator Specifies whether the digest is performed at initiator
  *   or responder side
  * @return Error code
  **/
 
 error_t ikeGetSignedOctets(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
-   uint8_t *macId, EddsaMessageChunk *messageChunks, bool_t initiator)
+   uint8_t *macId, DataChunk *messageChunks, bool_t initiator)
 {
    error_t error;
 

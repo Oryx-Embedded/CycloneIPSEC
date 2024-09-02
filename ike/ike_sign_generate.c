@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.2
+ * @version 2.4.4
  **/
 
 //Switch to the appropriate trace level
@@ -621,7 +621,7 @@ error_t ikeGenerateEd25519Signature(IkeSaEntry *sa, const uint8_t *id,
    error_t error;
    IkeContext *context;
    EddsaPrivateKey ed25519PrivateKey;
-   EddsaMessageChunk messageChunks[4];
+   DataChunk messageChunks[4];
    uint8_t macId[MAX_HASH_DIGEST_SIZE];
    uint8_t d[ED25519_PRIVATE_KEY_LEN];
 
@@ -695,7 +695,7 @@ error_t ikeGenerateEd448Signature(IkeSaEntry *sa, const uint8_t *id,
    error_t error;
    IkeContext *context;
    EddsaPrivateKey ed448PrivateKey;
-   EddsaMessageChunk messageChunks[4];
+   DataChunk messageChunks[4];
    uint8_t macId[MAX_HASH_DIGEST_SIZE];
    uint8_t d[ED448_PRIVATE_KEY_LEN];
 

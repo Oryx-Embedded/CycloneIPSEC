@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.2
+ * @version 2.4.4
  **/
 
 #ifndef _IKE_H
@@ -1814,7 +1814,7 @@ struct _IkeContext
 {
    bool_t running;                        ///<Operational state of IKEv2
    bool_t stop;                           ///<Stop request
-   OsEvent event;                         ///<Event object used to poll the sockets
+   OsEvent event;                         ///<Event object used to poll the underlying socket
    OsTaskParameters taskParams;           ///<Task parameters
    OsTaskId taskId;                       ///<Task identifier
    NetInterface *interface;               ///<Underlying network interface

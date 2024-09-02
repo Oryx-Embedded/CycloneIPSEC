@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.2
+ * @version 2.4.4
  **/
 
 #ifndef _IKE_SIGN_MISC_H
@@ -91,7 +91,7 @@ const HashAlgo *ikeSelectSignHashAlgo(IkeSaEntry *sa,
    uint16_t preferredHashAlgoId);
 
 error_t ikeGetSignedOctets(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
-   uint8_t *macId, EddsaMessageChunk *messageChunks, bool_t initiator);
+   uint8_t *macId, DataChunk *messageChunks, bool_t initiator);
 
 error_t ikeDigestSignedOctets(IkeSaEntry *sa, const HashAlgo *hashAlgo,
    const uint8_t *id, size_t idLen, uint8_t *digest, bool_t initiator);

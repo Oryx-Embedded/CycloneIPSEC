@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.2
+ * @version 2.4.4
  **/
 
 //Switch to the appropriate trace level
@@ -179,7 +179,7 @@ error_t ikeInit(IkeContext *context, const IkeSettings *settings)
    //Initialize status code
    error = NO_ERROR;
 
-   //Create an event object to poll the state of sockets
+   //Create an event object to poll the state of the UDP socket
    if(!osCreateEvent(&context->event))
    {
       //Failed to create event
@@ -299,6 +299,7 @@ error_t ikeStop(IkeContext *context)
    //Check whether the IKE service is running
    if(context->running)
    {
+#if (NET_RTOS_SUPPORT == ENABLED)
       //Stop the IKE service
       context->stop = TRUE;
       //Send a signal to the task to abort any blocking operation
@@ -309,6 +310,7 @@ error_t ikeStop(IkeContext *context)
       {
          osDelayTask(1);
       }
+#endif
 
       //Close the UDP socket
       socketClose(context->socket);
