@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 //Switch to the appropriate trace level
@@ -82,8 +82,8 @@ error_t ikeFormatDsaSignature(const DsaSignature *signature, uint8_t *data,
    }
    else if(format == IKE_SIGN_FORMAT_ASN1)
    {
-      //Encoded the DSA signature using ASN.1
-      error = dsaWriteSignature(signature, data, length);
+      //Encode the DSA signature using ASN.1
+      error = dsaExportSignature(signature, data, length);
    }
    else
    {
@@ -102,7 +102,6 @@ error_t ikeFormatDsaSignature(const DsaSignature *signature, uint8_t *data,
 
 /**
  * @brief ECDSA signature formatting
- * @param[in] params EC domain parameters
  * @param[in] signature (R, S) integer pair
  * @param[out] data Pointer to the buffer where to store the encoded signature
  * @param[out] length Length of the encoded signature, in bytes
@@ -110,9 +109,8 @@ error_t ikeFormatDsaSignature(const DsaSignature *signature, uint8_t *data,
  * @return Error code
  **/
 
-error_t ikeFormatEcdsaSignature(EcDomainParameters *params,
-   const EcdsaSignature *signature, uint8_t *data, size_t *length,
-   IkeSignFormat format)
+error_t ikeFormatEcdsaSignature(const EcdsaSignature *signature, uint8_t *data,
+   size_t *length, IkeSignFormat format)
 {
 #if (IKE_ECDSA_SIGN_SUPPORT == ENABLED)
    error_t error;
@@ -120,34 +118,17 @@ error_t ikeFormatEcdsaSignature(EcDomainParameters *params,
    //Check signature format
    if(format == IKE_SIGN_FORMAT_RAW)
    {
-      size_t n;
-
       //The signature payload shall contain an encoding of the computed
       //signature consisting of the concatenation of a pair of integers R
       //and S (refer to RFC 4754, section 7)
-      n = mpiGetByteLength(&params->p);
-
-      //Encode integer R
-      error = mpiExport(&signature->r, data, n, MPI_FORMAT_BIG_ENDIAN);
-
-      //Check status code
-      if(!error)
-      {
-         //Encode integer S
-         error = mpiExport(&signature->s, data + n, n, MPI_FORMAT_BIG_ENDIAN);
-      }
-
-      //Check status code
-      if(!error)
-      {
-         //Return the length of the signature
-         *length = 2 * n;
-      }
+      error = ecdsaExportSignature(signature, data, length,
+         ECDSA_SIGNATURE_FORMAT_RAW);
    }
    else if(format == IKE_SIGN_FORMAT_ASN1)
    {
-      //Encoded the ECDSA signature using ASN.1
-      error = ecdsaWriteSignature(signature, data, length);
+      //Encode the ECDSA signature using ASN.1
+      error = ecdsaExportSignature(signature, data, length,
+         ECDSA_SIGNATURE_FORMAT_ASN1);
    }
    else
    {
@@ -206,7 +187,7 @@ error_t ikeParseDsaSignature(const uint8_t *data, size_t length,
    else if(format == IKE_SIGN_FORMAT_ASN1)
    {
       //Read the ASN.1 encoded signature
-      error = dsaReadSignature(data, length, signature);
+      error = dsaImportSignature(signature, data, length);
    }
    else
    {
@@ -225,7 +206,7 @@ error_t ikeParseDsaSignature(const uint8_t *data, size_t length,
 
 /**
  * @brief ECDSA signature parsing
- * @param[in] params EC domain parameters
+ * @param[in] curve Elliptic curve parameters
  * @param[in] data Pointer to the encoded signature
  * @param[in] length Length of the encoded signature, in bytes
  * @param[out] signature (R, S) integer pair
@@ -233,45 +214,26 @@ error_t ikeParseDsaSignature(const uint8_t *data, size_t length,
  * @return Error code
  **/
 
-error_t ikeParseEcdsaSignature(EcDomainParameters *params, const uint8_t *data,
+error_t ikeParseEcdsaSignature(const EcCurve *curve, const uint8_t *data,
    size_t length, EcdsaSignature *signature, IkeSignFormat format)
 {
 #if (IKE_ECDSA_SIGN_SUPPORT == ENABLED)
    error_t error;
-   size_t modLen;
 
    //Check signature format
    if(format == IKE_SIGN_FORMAT_RAW)
    {
-      //Retrieve the length of the modulus
-      modLen = mpiGetByteLength(&params->p);
-
       //The signature payload shall contain an encoding of the computed
       //signature consisting of the concatenation of a pair of integers
       //R and S (refer to RFC 4754, section 7)
-      if(length == (2 * modLen))
-      {
-         //Import integer R
-         error = mpiImport(&signature->r, data, modLen, MPI_FORMAT_BIG_ENDIAN);
-
-         //Check status code
-         if(!error)
-         {
-            //Import integer S
-            error = mpiImport(&signature->s, data + modLen, modLen,
-               MPI_FORMAT_BIG_ENDIAN);
-         }
-      }
-      else
-      {
-         //The length of the signature is not acceptable
-         error = ERROR_INVALID_SIGNATURE;
-      }
+      error = ecdsaImportSignature(signature, curve, data, length,
+         ECDSA_SIGNATURE_FORMAT_RAW);
    }
    else if(format == IKE_SIGN_FORMAT_ASN1)
    {
       //Read the ASN.1 encoded signature
-      error = ecdsaReadSignature(data, length, signature);
+      error = ecdsaImportSignature(signature, curve, data, length,
+         ECDSA_SIGNATURE_FORMAT_ASN1);
    }
    else
    {
@@ -552,8 +514,7 @@ error_t ikeSelectSignAlgo(const X509SignAlgoId *signAlgoId,
 
 #if (IKE_RSA_SIGN_SUPPORT == ENABLED && IKE_SHA1_SUPPORT == ENABLED)
    //RSA with SHA-1 signature algorithm?
-   if(!oidComp(oid, oidLen, SHA1_WITH_RSA_ENCRYPTION_OID,
-      sizeof(SHA1_WITH_RSA_ENCRYPTION_OID)))
+   if(OID_COMP(oid, oidLen, SHA1_WITH_RSA_ENCRYPTION_OID) == 0)
    {
       *signAlgo = IKE_SIGN_ALGO_RSA;
       *hashAlgo = SHA1_HASH_ALGO;
@@ -562,8 +523,7 @@ error_t ikeSelectSignAlgo(const X509SignAlgoId *signAlgoId,
 #endif
 #if (IKE_RSA_SIGN_SUPPORT == ENABLED && IKE_SHA256_SUPPORT == ENABLED)
    //RSA with SHA-256 signature algorithm?
-   if(!oidComp(oid, oidLen, SHA256_WITH_RSA_ENCRYPTION_OID,
-      sizeof(SHA256_WITH_RSA_ENCRYPTION_OID)))
+   if(OID_COMP(oid, oidLen, SHA256_WITH_RSA_ENCRYPTION_OID) == 0)
    {
       *signAlgo = IKE_SIGN_ALGO_RSA;
       *hashAlgo = SHA256_HASH_ALGO;
@@ -572,8 +532,7 @@ error_t ikeSelectSignAlgo(const X509SignAlgoId *signAlgoId,
 #endif
 #if (IKE_RSA_SIGN_SUPPORT == ENABLED && IKE_SHA384_SUPPORT == ENABLED)
    //RSA with SHA-384 signature algorithm?
-   if(!oidComp(oid, oidLen, SHA384_WITH_RSA_ENCRYPTION_OID,
-      sizeof(SHA384_WITH_RSA_ENCRYPTION_OID)))
+   if(OID_COMP(oid, oidLen, SHA384_WITH_RSA_ENCRYPTION_OID) == 0)
    {
       *signAlgo = IKE_SIGN_ALGO_RSA;
       *hashAlgo = SHA384_HASH_ALGO;
@@ -582,8 +541,7 @@ error_t ikeSelectSignAlgo(const X509SignAlgoId *signAlgoId,
 #endif
 #if (IKE_RSA_SIGN_SUPPORT == ENABLED && IKE_SHA512_SUPPORT == ENABLED)
    //RSA with SHA-512 signature algorithm?
-   if(!oidComp(oid, oidLen, SHA512_WITH_RSA_ENCRYPTION_OID,
-      sizeof(SHA512_WITH_RSA_ENCRYPTION_OID)))
+   if(OID_COMP(oid, oidLen, SHA512_WITH_RSA_ENCRYPTION_OID) == 0)
    {
       *signAlgo = IKE_SIGN_ALGO_RSA;
       *hashAlgo = SHA512_HASH_ALGO;
@@ -592,8 +550,7 @@ error_t ikeSelectSignAlgo(const X509SignAlgoId *signAlgoId,
 #endif
 #if (IKE_RSA_PSS_SIGN_SUPPORT == ENABLED)
    //RSA-PSS signature algorithm
-   if(!oidComp(oid, oidLen, RSASSA_PSS_OID,
-      sizeof(RSASSA_PSS_OID)))
+   if(OID_COMP(oid, oidLen, RSASSA_PSS_OID) == 0)
    {
       //Get the OID of the hash algorithm
       oid = signAlgoId->rsaPssParams.hashAlgo.value;
@@ -601,7 +558,7 @@ error_t ikeSelectSignAlgo(const X509SignAlgoId *signAlgoId,
 
 #if (IKE_SHA1_SUPPORT == ENABLED)
       //SHA-1 hash algorithm identifier?
-      if(!oidComp(oid, oidLen, SHA1_OID, sizeof(SHA1_OID)))
+      if(OID_COMP(oid, oidLen, SHA1_OID) == 0)
       {
          //RSA-PSS with SHA-1 signature algorithm
          *signAlgo = IKE_SIGN_ALGO_RSA_PSS;
@@ -611,7 +568,7 @@ error_t ikeSelectSignAlgo(const X509SignAlgoId *signAlgoId,
 #endif
 #if (IKE_SHA256_SUPPORT == ENABLED)
       //SHA-256 hash algorithm identifier?
-      if(!oidComp(oid, oidLen, SHA256_OID, sizeof(SHA256_OID)))
+      if(OID_COMP(oid, oidLen, SHA256_OID) == 0)
       {
          //RSA-PSS with SHA-256 signature algorithm
          *signAlgo = IKE_SIGN_ALGO_RSA_PSS;
@@ -621,7 +578,7 @@ error_t ikeSelectSignAlgo(const X509SignAlgoId *signAlgoId,
 #endif
 #if (IKE_SHA384_SUPPORT == ENABLED)
       //SHA-384 hash algorithm identifier?
-      if(!oidComp(oid, oidLen, SHA384_OID, sizeof(SHA384_OID)))
+      if(OID_COMP(oid, oidLen, SHA384_OID) == 0)
       {
          //RSA-PSS with SHA-384 signature algorithm
          *signAlgo = IKE_SIGN_ALGO_RSA_PSS;
@@ -631,7 +588,7 @@ error_t ikeSelectSignAlgo(const X509SignAlgoId *signAlgoId,
 #endif
 #if (IKE_SHA512_SUPPORT == ENABLED)
       //SHA-512 hash algorithm identifier?
-      if(!oidComp(oid, oidLen, SHA512_OID, sizeof(SHA512_OID)))
+      if(OID_COMP(oid, oidLen, SHA512_OID) == 0)
       {
          //RSA-PSS with SHA-512 signature algorithm
          *signAlgo = IKE_SIGN_ALGO_RSA_PSS;
@@ -649,8 +606,7 @@ error_t ikeSelectSignAlgo(const X509SignAlgoId *signAlgoId,
 #endif
 #if (IKE_DSA_SIGN_SUPPORT == ENABLED && IKE_SHA1_SUPPORT == ENABLED)
    //DSA with SHA-1 signature algorithm?
-   if(!oidComp(oid, oidLen, DSA_WITH_SHA1_OID,
-      sizeof(DSA_WITH_SHA1_OID)))
+   if(OID_COMP(oid, oidLen, DSA_WITH_SHA1_OID) == 0)
    {
       *signAlgo = IKE_SIGN_ALGO_DSA;
       *hashAlgo = SHA1_HASH_ALGO;
@@ -659,8 +615,7 @@ error_t ikeSelectSignAlgo(const X509SignAlgoId *signAlgoId,
 #endif
 #if (IKE_DSA_SIGN_SUPPORT == ENABLED && IKE_SHA256_SUPPORT == ENABLED)
    //DSA with SHA-256 signature algorithm?
-   if(!oidComp(oid, oidLen, DSA_WITH_SHA256_OID,
-      sizeof(DSA_WITH_SHA256_OID)))
+   if(OID_COMP(oid, oidLen, DSA_WITH_SHA256_OID) == 0)
    {
       *signAlgo = IKE_SIGN_ALGO_DSA;
       *hashAlgo = SHA256_HASH_ALGO;
@@ -669,8 +624,7 @@ error_t ikeSelectSignAlgo(const X509SignAlgoId *signAlgoId,
 #endif
 #if (IKE_DSA_SIGN_SUPPORT == ENABLED && IKE_SHA384_SUPPORT == ENABLED)
    //DSA with SHA-384 signature algorithm?
-   if(!oidComp(oid, oidLen, DSA_WITH_SHA384_OID,
-      sizeof(DSA_WITH_SHA384_OID)))
+   if(OID_COMP(oid, oidLen, DSA_WITH_SHA384_OID) == 0)
    {
       *signAlgo = IKE_SIGN_ALGO_DSA;
       *hashAlgo = SHA384_HASH_ALGO;
@@ -679,8 +633,7 @@ error_t ikeSelectSignAlgo(const X509SignAlgoId *signAlgoId,
 #endif
 #if (IKE_DSA_SIGN_SUPPORT == ENABLED && IKE_SHA512_SUPPORT == ENABLED)
    //DSA with SHA-512 signature algorithm?
-   if(!oidComp(oid, oidLen, DSA_WITH_SHA512_OID,
-      sizeof(DSA_WITH_SHA512_OID)))
+   if(OID_COMP(oid, oidLen, DSA_WITH_SHA512_OID) == 0)
    {
       *signAlgo = IKE_SIGN_ALGO_DSA;
       *hashAlgo = SHA512_HASH_ALGO;
@@ -689,8 +642,7 @@ error_t ikeSelectSignAlgo(const X509SignAlgoId *signAlgoId,
 #endif
 #if (IKE_ECDSA_SIGN_SUPPORT == ENABLED && IKE_SHA1_SUPPORT == ENABLED)
    //ECDSA with SHA-1 signature algorithm?
-   if(!oidComp(oid, oidLen, ECDSA_WITH_SHA1_OID,
-      sizeof(ECDSA_WITH_SHA1_OID)))
+   if(OID_COMP(oid, oidLen, ECDSA_WITH_SHA1_OID) == 0)
    {
       *signAlgo = IKE_SIGN_ALGO_ECDSA;
       *hashAlgo = SHA1_HASH_ALGO;
@@ -699,8 +651,7 @@ error_t ikeSelectSignAlgo(const X509SignAlgoId *signAlgoId,
 #endif
 #if (IKE_ECDSA_SIGN_SUPPORT == ENABLED && IKE_SHA256_SUPPORT == ENABLED)
    //ECDSA with SHA-256 signature algorithm?
-   if(!oidComp(oid, oidLen, ECDSA_WITH_SHA256_OID,
-      sizeof(ECDSA_WITH_SHA256_OID)))
+   if(OID_COMP(oid, oidLen, ECDSA_WITH_SHA256_OID) == 0)
    {
       *signAlgo = IKE_SIGN_ALGO_ECDSA;
       *hashAlgo = SHA256_HASH_ALGO;
@@ -709,8 +660,7 @@ error_t ikeSelectSignAlgo(const X509SignAlgoId *signAlgoId,
 #endif
 #if (IKE_ECDSA_SIGN_SUPPORT == ENABLED && IKE_SHA384_SUPPORT == ENABLED)
    //ECDSA with SHA-384 signature algorithm?
-   if(!oidComp(oid, oidLen, ECDSA_WITH_SHA384_OID,
-      sizeof(ECDSA_WITH_SHA384_OID)))
+   if(OID_COMP(oid, oidLen, ECDSA_WITH_SHA384_OID) == 0)
    {
       *signAlgo = IKE_SIGN_ALGO_ECDSA;
       *hashAlgo = SHA384_HASH_ALGO;
@@ -719,8 +669,7 @@ error_t ikeSelectSignAlgo(const X509SignAlgoId *signAlgoId,
 #endif
 #if (IKE_ECDSA_SIGN_SUPPORT == ENABLED && IKE_SHA512_SUPPORT == ENABLED)
    //ECDSA with SHA-512 signature algorithm?
-   if(!oidComp(oid, oidLen, ECDSA_WITH_SHA512_OID,
-      sizeof(ECDSA_WITH_SHA512_OID)))
+   if(OID_COMP(oid, oidLen, ECDSA_WITH_SHA512_OID) == 0)
    {
       *signAlgo = IKE_SIGN_ALGO_ECDSA;
       *hashAlgo = SHA512_HASH_ALGO;
@@ -729,7 +678,7 @@ error_t ikeSelectSignAlgo(const X509SignAlgoId *signAlgoId,
 #endif
 #if (IKE_ED25519_SIGN_SUPPORT == ENABLED)
    //Ed25519 signature algorithm?
-   if(!oidComp(oid, oidLen, ED25519_OID, sizeof(ED25519_OID)))
+   if(OID_COMP(oid, oidLen, ED25519_OID) == 0)
    {
       *signAlgo = IKE_SIGN_ALGO_ED25519;
       *hashAlgo = NULL;
@@ -738,7 +687,7 @@ error_t ikeSelectSignAlgo(const X509SignAlgoId *signAlgoId,
 #endif
 #if (IKE_ED448_SIGN_SUPPORT == ENABLED)
    //Ed448 signature algorithm?
-   if(!oidComp(oid, oidLen, ED448_OID, sizeof(ED448_OID)))
+   if(OID_COMP(oid, oidLen, ED448_OID) == 0)
    {
       *signAlgo = IKE_SIGN_ALGO_ED448;
       *hashAlgo = NULL;
@@ -887,8 +836,6 @@ error_t ikeGetSignedOctets(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
          messageChunks[1].length = sa->responderNonceLen;
          messageChunks[2].buffer = macId;
          messageChunks[2].length = sa->prfKeyLen;
-         messageChunks[3].buffer = NULL;
-         messageChunks[3].length = 0;
       }
    }
    else
@@ -912,8 +859,6 @@ error_t ikeGetSignedOctets(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
          messageChunks[1].length = sa->initiatorNonceLen;
          messageChunks[2].buffer = macId;
          messageChunks[2].length = sa->prfKeyLen;
-         messageChunks[3].buffer = NULL;
-         messageChunks[3].length = 0;
       }
    }
 
@@ -939,7 +884,7 @@ error_t ikeDigestSignedOctets(IkeSaEntry *sa, const HashAlgo *hashAlgo,
 {
    error_t error;
    HashContext hashContext;
-   uint8_t macId[MAX_HASH_DIGEST_SIZE];
+   uint8_t macId[IKE_MAX_DIGEST_SIZE];
 
    //Check whether the calculation is performed at initiator side
    if(initiator)

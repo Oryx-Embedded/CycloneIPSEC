@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 //Switch to the appropriate trace level
@@ -56,7 +56,7 @@ error_t ikeGenerateSaKeyMaterial(IkeSaEntry *sa, IkeSaEntry *oldSa)
    size_t bufferLen;
    size_t keyMaterialLen;
    IkeContext *context;
-   uint8_t skeyseed[MAX_HASH_DIGEST_SIZE];
+   uint8_t skeyseed[IKE_MAX_DIGEST_SIZE];
    uint8_t buffer[2 * IKE_MAX_NONCE_SIZE + 2 * IKE_SPI_SIZE];
 
    //Point to the IKE context
@@ -457,48 +457,52 @@ error_t ikeComputePrfPlus(IkeSaEntry *sa, const uint8_t *k, size_t kLen,
    const uint8_t *s, size_t sLen, uint8_t *output, size_t outputLen)
 {
    error_t error;
-   size_t n;
    uint8_t c;
-   uint8_t t[MAX_HASH_DIGEST_SIZE];
 
    //Initialize status code
    error = NO_ERROR;
 
-   //Keying material will always be derived as the output of the negotiated
-   //PRF algorithm.  Since the amount of keying material needed may be greater
-   //than the size of the output of the PRF, the PRF is used iteratively
-   for(c = 1; outputLen > 0; c++)
    {
-      //Initialize PRF calculation
-      error = ikeInitPrf(sa, k, kLen);
-      //Any error to report?
-      if(error)
-         break;
+      size_t n;
+      uint8_t t[IKE_MAX_DIGEST_SIZE];
 
-      //Digest T(n-1)
-      if(c > 1)
+      //Keying material will always be derived as the output of the negotiated
+      //PRF algorithm.  Since the amount of keying material needed may be
+      //greater than the size of the output of the PRF, the PRF is used
+      //iteratively (refer to RFC 7296, section 2.13)
+      for(c = 1; outputLen > 0; c++)
       {
-         ikeUpdatePrf(sa, t, sa->prfKeyLen);
+         //Initialize PRF calculation
+         error = ikeInitPrf(sa, k, kLen);
+         //Any error to report?
+         if(error)
+            break;
+
+         //Digest T(n-1)
+         if(c > 1)
+         {
+            ikeUpdatePrf(sa, t, sa->prfKeyLen);
+         }
+
+         //Compute T(n) = prf(K, T(n-1) | S | c)
+         ikeUpdatePrf(sa, s, sLen);
+         ikeUpdatePrf(sa, &c, sizeof(uint8_t));
+
+         //Finalize PRF calculation
+         error = ikeFinalizePrf(sa, t);
+         //Any error to report?
+         if(error)
+            break;
+
+         //Calculate the number of bytes to copy
+         n = MIN(outputLen, sa->prfKeyLen);
+         //Copy the output of the PRF
+         osMemcpy(output, t, n);
+
+         //This process is repeated until enough key material is available
+         output += n;
+         outputLen -= n;
       }
-
-      //Compute T(n) = prf(K, T(n-1) | S | c)
-      ikeUpdatePrf(sa, s, sLen);
-      ikeUpdatePrf(sa, &c, sizeof(uint8_t));
-
-      //Finalize PRF calculation
-      error = ikeFinalizePrf(sa, t);
-      //Any error to report?
-      if(error)
-         break;
-
-      //Calculate the number of bytes to copy
-      n = MIN(outputLen, sa->prfKeyLen);
-      //Copy the output of the PRF
-      osMemcpy(output, t, n);
-
-      //This process is repeated until enough key material is available
-      output += n;
-      outputLen -= n;
    }
 
    //Return status code
@@ -521,15 +525,6 @@ error_t ikeInitPrf(IkeSaEntry *sa, const uint8_t *vk, size_t vkLen)
    //Initialize status code
    error = NO_ERROR;
 
-#if (IKE_HMAC_PRF_SUPPORT == ENABLED)
-   //HMAC PRF algorithm?
-   if(sa->prfHashAlgo != NULL)
-   {
-      //Initialize HMAC calculation
-      error = hmacInit(&sa->context->hmacContext, sa->prfHashAlgo, vk, vkLen);
-   }
-   else
-#endif
 #if (IKE_CMAC_PRF_SUPPORT == ENABLED)
    //CMAC PRF algorithm?
    if(sa->prfAlgoId == IKE_TRANSFORM_ID_PRF_AES128_CMAC &&
@@ -575,6 +570,15 @@ error_t ikeInitPrf(IkeSaEntry *sa, const uint8_t *vk, size_t vkLen)
          //We apply the AES-CMAC algorithm using K as the key
          error = cmacInit(cmacContext, sa->prfCipherAlgo, k, 16);
       }
+   }
+   else
+#endif
+#if (IKE_HMAC_PRF_SUPPORT == ENABLED)
+   //HMAC PRF algorithm?
+   if(sa->prfHashAlgo != NULL)
+   {
+      //Initialize HMAC calculation
+      error = hmacInit(&sa->context->hmacContext, sa->prfHashAlgo, vk, vkLen);
    }
    else
 #endif
@@ -652,15 +656,6 @@ error_t ikeInitPrf(IkeSaEntry *sa, const uint8_t *vk, size_t vkLen)
 
 void ikeUpdatePrf(IkeSaEntry *sa, const uint8_t *s, size_t sLen)
 {
-#if (IKE_HMAC_PRF_SUPPORT == ENABLED)
-   //HMAC PRF algorithm?
-   if(sa->prfHashAlgo != NULL)
-   {
-      //Update HMAC calculation
-      hmacUpdate(&sa->context->hmacContext, s, sLen);
-   }
-   else
-#endif
 #if (IKE_CMAC_PRF_SUPPORT == ENABLED)
    //CMAC PRF algorithm?
    if(sa->prfAlgoId == IKE_TRANSFORM_ID_PRF_AES128_CMAC &&
@@ -668,6 +663,15 @@ void ikeUpdatePrf(IkeSaEntry *sa, const uint8_t *s, size_t sLen)
    {
       //Update CMAC calculation
       cmacUpdate(&sa->context->cmacContext, s, sLen);
+   }
+   else
+#endif
+#if (IKE_HMAC_PRF_SUPPORT == ENABLED)
+   //HMAC PRF algorithm?
+   if(sa->prfHashAlgo != NULL)
+   {
+      //Update HMAC calculation
+      hmacUpdate(&sa->context->hmacContext, s, sLen);
    }
    else
 #endif
@@ -702,15 +706,6 @@ error_t ikeFinalizePrf(IkeSaEntry *sa, uint8_t *output)
    //Initialize status code
    error = NO_ERROR;
 
-#if (IKE_HMAC_PRF_SUPPORT == ENABLED)
-   //HMAC PRF algorithm?
-   if(sa->prfHashAlgo != NULL)
-   {
-      //Finalize HMAC calculation
-      hmacFinal(&sa->context->hmacContext, output);
-   }
-   else
-#endif
 #if (IKE_CMAC_PRF_SUPPORT == ENABLED)
    //CMAC PRF algorithm?
    if(sa->prfAlgoId == IKE_TRANSFORM_ID_PRF_AES128_CMAC &&
@@ -718,6 +713,15 @@ error_t ikeFinalizePrf(IkeSaEntry *sa, uint8_t *output)
    {
       //Finalize CMAC calculation
       error = cmacFinal(&sa->context->cmacContext, output, sa->prfKeyLen);
+   }
+   else
+#endif
+#if (IKE_HMAC_PRF_SUPPORT == ENABLED)
+   //HMAC PRF algorithm?
+   if(sa->prfHashAlgo != NULL)
+   {
+      //Finalize HMAC calculation
+      hmacFinal(&sa->context->hmacContext, output);
    }
    else
 #endif

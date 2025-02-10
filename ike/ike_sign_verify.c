@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 //Switch to the appropriate trace level
@@ -297,11 +297,11 @@ error_t ikeVerifyRsaSignature(IkeSaEntry *sa, const uint8_t *id,
    error_t error;
    uint_t k;
    RsaPublicKey rsaPublicKey;
-   uint8_t digest[MAX_HASH_DIGEST_SIZE];
+   uint8_t digest[IKE_MAX_DIGEST_SIZE];
 
    //Check public key identifier
-   if(!oidComp(publicKeyInfo->oid.value, publicKeyInfo->oid.length,
-      RSA_ENCRYPTION_OID, sizeof(RSA_ENCRYPTION_OID)))
+   if(OID_COMP(publicKeyInfo->oid.value, publicKeyInfo->oid.length,
+      RSA_ENCRYPTION_OID) == 0)
    {
       //Initialize RSA public key
       rsaInitPublicKey(&rsaPublicKey);
@@ -314,7 +314,7 @@ error_t ikeVerifyRsaSignature(IkeSaEntry *sa, const uint8_t *id,
       if(!error)
       {
          //Import RSA public key
-         error = x509ImportRsaPublicKey(publicKeyInfo, &rsaPublicKey);
+         error = x509ImportRsaPublicKey(&rsaPublicKey, publicKeyInfo);
       }
 
       //Check status code
@@ -381,15 +381,15 @@ error_t ikeVerifyRsaPssSignature(IkeSaEntry *sa, const uint8_t *id,
    size_t oidLen;
    const uint8_t *oid;
    RsaPublicKey rsaPublicKey;
-   uint8_t digest[MAX_HASH_DIGEST_SIZE];
+   uint8_t digest[IKE_MAX_DIGEST_SIZE];
 
    //Retrieve public key identifier
    oid = publicKeyInfo->oid.value;
    oidLen = publicKeyInfo->oid.length;
 
    //Check public key identifier
-   if(!oidComp(oid, oidLen, RSA_ENCRYPTION_OID, sizeof(RSA_ENCRYPTION_OID)) ||
-      !oidComp(oid, oidLen, RSASSA_PSS_OID, sizeof(RSASSA_PSS_OID)))
+   if(OID_COMP(oid, oidLen, RSA_ENCRYPTION_OID) == 0 ||
+      OID_COMP(oid, oidLen, RSASSA_PSS_OID) == 0)
    {
       //Initialize RSA public key
       rsaInitPublicKey(&rsaPublicKey);
@@ -402,7 +402,7 @@ error_t ikeVerifyRsaPssSignature(IkeSaEntry *sa, const uint8_t *id,
       if(!error)
       {
          //Import RSA public key
-         error = x509ImportRsaPublicKey(publicKeyInfo, &rsaPublicKey);
+         error = x509ImportRsaPublicKey(&rsaPublicKey, publicKeyInfo);
       }
 
       //Check status code
@@ -468,11 +468,11 @@ error_t ikeVerifyDsaSignature(IkeSaEntry *sa, const uint8_t *id,
    uint_t k;
    DsaPublicKey dsaPublicKey;
    DsaSignature dsaSignature;
-   uint8_t digest[MAX_HASH_DIGEST_SIZE];
+   uint8_t digest[IKE_MAX_DIGEST_SIZE];
 
    //Check public key identifier
-   if(!oidComp(publicKeyInfo->oid.value, publicKeyInfo->oid.length,
-      DSA_OID, sizeof(DSA_OID)))
+   if(OID_COMP(publicKeyInfo->oid.value, publicKeyInfo->oid.length,
+      DSA_OID) == 0)
    {
       //Initialize DSA public key
       dsaInitPublicKey(&dsaPublicKey);
@@ -487,7 +487,7 @@ error_t ikeVerifyDsaSignature(IkeSaEntry *sa, const uint8_t *id,
       if(!error)
       {
          //Import DSA public key
-         error = x509ImportDsaPublicKey(publicKeyInfo, &dsaPublicKey);
+         error = x509ImportDsaPublicKey(&dsaPublicKey, publicKeyInfo);
       }
 
       //Check status code
@@ -555,30 +555,27 @@ error_t ikeVerifyDsaSignature(IkeSaEntry *sa, const uint8_t *id,
 
 error_t ikeVerifyEcdsaSignature(IkeSaEntry *sa, const uint8_t *id,
    size_t idLen, const X509SubjectPublicKeyInfo *publicKeyInfo,
-   const EcCurveInfo *group, const HashAlgo *hashAlgo,
-   const uint8_t *signature, size_t signatureLen, IkeSignFormat format)
+   const EcCurve *group, const HashAlgo *hashAlgo, const uint8_t *signature,
+   size_t signatureLen, IkeSignFormat format)
 {
 #if (IKE_ECDSA_SIGN_SUPPORT == ENABLED)
    error_t error;
-   const EcCurveInfo *curveInfo;
-   EcDomainParameters ecParams;
+   const EcCurve *curve;
    EcPublicKey ecPublicKey;
    EcdsaSignature ecdsaSignature;
-   uint8_t digest[MAX_HASH_DIGEST_SIZE];
+   uint8_t digest[IKE_MAX_DIGEST_SIZE];
 
    //Check public key identifier
-   if(!oidComp(publicKeyInfo->oid.value, publicKeyInfo->oid.length,
-      EC_PUBLIC_KEY_OID, sizeof(EC_PUBLIC_KEY_OID)))
+   if(OID_COMP(publicKeyInfo->oid.value, publicKeyInfo->oid.length,
+      EC_PUBLIC_KEY_OID) == 0)
    {
       //Retrieve EC domain parameters
-      curveInfo = ecGetCurveInfo(publicKeyInfo->ecParams.namedCurve.value,
+      curve = ecGetCurve(publicKeyInfo->ecParams.namedCurve.value,
          publicKeyInfo->ecParams.namedCurve.length);
 
       //Make sure the specified elliptic curve is acceptable
-      if(curveInfo != NULL && (curveInfo == group || group == NULL))
+      if(curve != NULL && (curve == group || group == NULL))
       {
-         //Initialize EC domain parameters
-         ecInitDomainParameters(&ecParams);
          //Initialize DSA public key
          ecInitPublicKey(&ecPublicKey);
          //Initialize DSA signature
@@ -591,22 +588,15 @@ error_t ikeVerifyEcdsaSignature(IkeSaEntry *sa, const uint8_t *id,
          //Check status code
          if(!error)
          {
-            //Load EC domain parameters
-            error = ecLoadDomainParameters(&ecParams, curveInfo);
-         }
-
-         //Check status code
-         if(!error)
-         {
             //Import EC public key
-            error = x509ImportEcPublicKey(publicKeyInfo, &ecPublicKey);
+            error = x509ImportEcPublicKey(&ecPublicKey, publicKeyInfo);
          }
 
          //Check status code
          if(!error)
          {
             //Decode (R, S) integer pair
-            error = ikeParseEcdsaSignature(&ecParams, signature, signatureLen,
+            error = ikeParseEcdsaSignature(curve, signature, signatureLen,
                &ecdsaSignature, format);
          }
 
@@ -614,12 +604,11 @@ error_t ikeVerifyEcdsaSignature(IkeSaEntry *sa, const uint8_t *id,
          if(!error)
          {
             //Verify ECDSA signature
-            error = ecdsaVerifySignature(&ecParams, &ecPublicKey, digest,
+            error = ecdsaVerifySignature(&ecPublicKey, digest,
                hashAlgo->digestSize, &ecdsaSignature);
          }
 
          //Free previously allocated memory
-         ecFreeDomainParameters(&ecParams);
          ecFreePublicKey(&ecPublicKey);
          ecdsaFreeSignature(&ecdsaSignature);
       }
@@ -661,12 +650,12 @@ error_t ikeVerifyEd25519Signature(IkeSaEntry *sa, const uint8_t *id,
 {
 #if (IKE_ED25519_SIGN_SUPPORT == ENABLED)
    error_t error;
-   DataChunk messageChunks[4];
-   uint8_t macId[MAX_HASH_DIGEST_SIZE];
+   DataChunk messageChunks[3];
+   uint8_t macId[IKE_MAX_DIGEST_SIZE];
 
    //Check public key identifier
-   if(!oidComp(publicKeyInfo->oid.value, publicKeyInfo->oid.length,
-      ED25519_OID, sizeof(ED25519_OID)))
+   if(OID_COMP(publicKeyInfo->oid.value, publicKeyInfo->oid.length,
+      ED25519_OID) == 0)
    {
       //Valid Ed25519 public key?
       if(publicKeyInfo->ecPublicKey.q.value != NULL &&
@@ -685,7 +674,7 @@ error_t ikeVerifyEd25519Signature(IkeSaEntry *sa, const uint8_t *id,
             {
                //Verify Ed25519 signature (PureEdDSA mode)
                error = ed25519VerifySignatureEx(publicKeyInfo->ecPublicKey.q.value,
-                  messageChunks, NULL, 0, 0, signature);
+                  messageChunks, arraysize(messageChunks), NULL, 0, 0, signature);
             }
          }
          else
@@ -732,12 +721,12 @@ error_t ikeVerifyEd448Signature(IkeSaEntry *sa, const uint8_t *id,
 {
 #if (IKE_ED448_SIGN_SUPPORT == ENABLED)
    error_t error;
-   DataChunk messageChunks[4];
-   uint8_t macId[MAX_HASH_DIGEST_SIZE];
+   DataChunk messageChunks[3];
+   uint8_t macId[IKE_MAX_DIGEST_SIZE];
 
    //Check public key identifier
-   if(!oidComp(publicKeyInfo->oid.value, publicKeyInfo->oid.length,
-      ED448_OID, sizeof(ED448_OID)))
+   if(OID_COMP(publicKeyInfo->oid.value, publicKeyInfo->oid.length,
+      ED448_OID) == 0)
    {
       //Valid Ed448 public key?
       if(publicKeyInfo->ecPublicKey.q.value != NULL &&
@@ -756,7 +745,7 @@ error_t ikeVerifyEd448Signature(IkeSaEntry *sa, const uint8_t *id,
             {
                //Verify Ed448 signature (PureEdDSA mode)
                error = ed448VerifySignatureEx(publicKeyInfo->ecPublicKey.q.value,
-                  messageChunks, NULL, 0, 0, signature);
+                  messageChunks, arraysize(messageChunks), NULL, 0, 0, signature);
             }
          }
          else

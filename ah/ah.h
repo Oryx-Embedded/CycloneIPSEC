@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 #ifndef _AH_H
@@ -60,6 +60,20 @@
    #define AH_HMAC_SUPPORT ENABLED
 #elif (AH_HMAC_SUPPORT != ENABLED && AH_HMAC_SUPPORT != DISABLED)
    #error AH_HMAC_SUPPORT parameter is not valid
+#endif
+
+//KMAC128 integrity support (experimental)
+#ifndef AH_KMAC128_SUPPORT
+   #define AH_KMAC128_SUPPORT DISABLED
+#elif (AH_KMAC128_SUPPORT != ENABLED && AH_KMAC128_SUPPORT != DISABLED)
+   #error AH_KMAC128_SUPPORT parameter is not valid
+#endif
+
+//KMAC256 integrity support (experimental)
+#ifndef AH_KMAC256_SUPPORT
+   #define AH_KMAC256_SUPPORT DISABLED
+#elif (AH_KMAC256_SUPPORT != ENABLED && AH_KMAC256_SUPPORT != DISABLED)
+   #error AH_KMAC256_SUPPORT parameter is not valid
 #endif
 
 //AES 128-bit cipher support
@@ -102,6 +116,45 @@
    #define AH_SHA512_SUPPORT ENABLED
 #elif (AH_SHA512_SUPPORT != ENABLED && AH_SHA512_SUPPORT != DISABLED)
    #error AH_SHA512_SUPPORT parameter is not valid
+#endif
+
+//SHA3-256 hash support (experimental)
+#ifndef AH_SHA3_256_SUPPORT
+   #define AH_SHA3_256_SUPPORT DISABLED
+#elif (AH_SHA3_256_SUPPORT != ENABLED && AH_SHA3_256_SUPPORT != DISABLED)
+   #error AH_SHA3_256_SUPPORT parameter is not valid
+#endif
+
+//SHA3-384 hash support (experimental)
+#ifndef AH_SHA3_384_SUPPORT
+   #define AH_SHA3_384_SUPPORT DISABLED
+#elif (AH_SHA3_384_SUPPORT != ENABLED && AH_SHA3_384_SUPPORT != DISABLED)
+   #error AH_SHA3_384_SUPPORT parameter is not valid
+#endif
+
+//SHA3-512 hash support (experimental)
+#ifndef AH_SHA3_512_SUPPORT
+   #define AH_SHA3_512_SUPPORT DISABLED
+#elif (AH_SHA3_512_SUPPORT != ENABLED && AH_SHA3_512_SUPPORT != DISABLED)
+   #error AH_SHA3_512_SUPPORT parameter is not valid
+#endif
+
+//SM3 hash support (experimental)
+#ifndef AH_SM3_SUPPORT
+   #define AH_SM3_SUPPORT DISABLED
+#elif (AH_SM3_SUPPORT != ENABLED && AH_SM3_SUPPORT != DISABLED)
+   #error AH_SM3_SUPPORT parameter is not valid
+#endif
+
+//Maximum digest size
+#if (AH_HMAC_SUPPORT == ENABLED && AH_SHA512_SUPPORT == ENABLED)
+   #define AH_MAX_DIGEST_SIZE 64
+#elif (AH_HMAC_SUPPORT == ENABLED && AH_SHA384_SUPPORT == ENABLED)
+   #define AH_MAX_DIGEST_SIZE 48
+#elif (AH_HMAC_SUPPORT == ENABLED && AH_SHA256_SUPPORT == ENABLED)
+   #define AH_MAX_DIGEST_SIZE 32
+#else
+   #define AH_MAX_DIGEST_SIZE 12
 #endif
 
 //Maximum size of the ICV field

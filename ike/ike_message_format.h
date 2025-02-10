@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 #ifndef _IKE_MESSAGE_FORMAT_H
@@ -46,8 +46,8 @@ error_t ikeSendIkeAuthRequest(IkeSaEntry *sa);
 error_t ikeSendIkeAuthResponse(IkeSaEntry *sa);
 error_t ikeSendCreateChildSaRequest(IkeSaEntry *sa, IkeChildSaEntry *childSa);
 error_t ikeSendCreateChildSaResponse(IkeSaEntry *sa, IkeChildSaEntry *childSa);
-error_t ikeSendInformationalRequest(IkeSaEntry *sa);
-error_t ikeSendInformationalResponse(IkeSaEntry *sa);
+error_t ikeSendInfoRequest(IkeSaEntry *sa);
+error_t ikeSendInfoResponse(IkeSaEntry *sa);
 
 error_t ikeSendErrorResponse(IkeContext *context, uint8_t *message,
    size_t length);
@@ -63,10 +63,10 @@ error_t ikeFormatCreateChildSaRequest(IkeSaEntry *sa, IkeChildSaEntry *childSa,
 error_t ikeFormatCreateChildSaResponse(IkeSaEntry *sa, IkeChildSaEntry *childSa,
    uint8_t *p, size_t *length);
 
-error_t ikeFormatInformationalRequest(IkeSaEntry *sa, uint8_t *p,
+error_t ikeFormatInfoRequest(IkeSaEntry *sa, uint8_t *p,
    size_t *length);
 
-error_t ikeFormatInformationalResponse(IkeSaEntry *sa, uint8_t *p,
+error_t ikeFormatInfoResponse(IkeSaEntry *sa, uint8_t *p,
    size_t *length);
 
 error_t ikeFormatErrorResponse(IkeHeader *requestHeader, uint8_t *p,

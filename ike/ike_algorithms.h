@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 #ifndef _IKE_ALGORITHMS_H
@@ -114,13 +114,11 @@ bool_t ikeIsVariableLengthKeyEncAlgo(uint16_t encAlgoId);
 
 bool_t ikeIsDhKeyExchangeAlgo(uint16_t groupNum);
 bool_t ikeIsEcdhKeyExchangeAlgo(uint16_t groupNum);
+bool_t ikeIsMlkemKeyExchangeAlgo(uint16_t groupNum);
 
-const EcCurveInfo *ikeGetEcdhCurveInfo(uint16_t groupNum);
-error_t ikeLoadEcdhParams(EcDomainParameters *params, uint16_t groupNum);
-
+const EcCurve *ikeGetEcdhCurve(uint16_t groupNum);
 uint16_t ikeSelectDefaultDhGroup(void);
 bool_t ikeIsDhGroupSupported(uint16_t groupNum);
-
 bool_t ikeIsHashAlgoSupported(uint16_t hashAlgoId);
 
 //C++ guard

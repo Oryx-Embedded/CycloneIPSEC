@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 #ifndef _ESP_H
@@ -125,6 +125,20 @@
    #error ESP_HMAC_SUPPORT parameter is not valid
 #endif
 
+//KMAC128 integrity support (experimental)
+#ifndef ESP_KMAC128_SUPPORT
+   #define ESP_KMAC128_SUPPORT DISABLED
+#elif (ESP_KMAC128_SUPPORT != ENABLED && ESP_KMAC128_SUPPORT != DISABLED)
+   #error ESP_KMAC128_SUPPORT parameter is not valid
+#endif
+
+//KMAC256 integrity support (experimental)
+#ifndef ESP_KMAC256_SUPPORT
+   #define ESP_KMAC256_SUPPORT DISABLED
+#elif (ESP_KMAC256_SUPPORT != ENABLED && ESP_KMAC256_SUPPORT != DISABLED)
+   #error ESP_KMAC256_SUPPORT parameter is not valid
+#endif
+
 //IDEA cipher support (insecure)
 #ifndef ESP_IDEA_SUPPORT
    #define ESP_IDEA_SUPPORT DISABLED
@@ -188,6 +202,13 @@
    #error ESP_CAMELLIA_256_SUPPORT parameter is not valid
 #endif
 
+//SM4 cipher support (experimental)
+#ifndef ESP_SM4_SUPPORT
+   #define ESP_SM4_SUPPORT DISABLED
+#elif (ESP_SM4_SUPPORT != ENABLED && ESP_SM4_SUPPORT != DISABLED)
+   #error ESP_SM4_SUPPORT parameter is not valid
+#endif
+
 //MD5 hash support (insecure)
 #ifndef ESP_MD5_SUPPORT
    #define ESP_MD5_SUPPORT DISABLED
@@ -223,11 +244,61 @@
    #error ESP_SHA512_SUPPORT parameter is not valid
 #endif
 
+//SHA3-256 hash support (experimental)
+#ifndef ESP_SHA3_256_SUPPORT
+   #define ESP_SHA3_256_SUPPORT DISABLED
+#elif (ESP_SHA3_256_SUPPORT != ENABLED && ESP_SHA3_256_SUPPORT != DISABLED)
+   #error ESP_SHA3_256_SUPPORT parameter is not valid
+#endif
+
+//SHA3-384 hash support (experimental)
+#ifndef ESP_SHA3_384_SUPPORT
+   #define ESP_SHA3_384_SUPPORT DISABLED
+#elif (ESP_SHA3_384_SUPPORT != ENABLED && ESP_SHA3_384_SUPPORT != DISABLED)
+   #error ESP_SHA3_384_SUPPORT parameter is not valid
+#endif
+
+//SHA3-512 hash support (experimental)
+#ifndef ESP_SHA3_512_SUPPORT
+   #define ESP_SHA3_512_SUPPORT DISABLED
+#elif (ESP_SHA3_512_SUPPORT != ENABLED && ESP_SHA3_512_SUPPORT != DISABLED)
+   #error ESP_SHA3_512_SUPPORT parameter is not valid
+#endif
+
+//SM3 hash support (experimental)
+#ifndef ESP_SM3_SUPPORT
+   #define ESP_SM3_SUPPORT DISABLED
+#elif (ESP_SM3_SUPPORT != ENABLED && ESP_SM3_SUPPORT != DISABLED)
+   #error ESP_SM3_SUPPORT parameter is not valid
+#endif
+
 //Size of the buffer for input/output operations
 #ifndef ESP_BUFFER_SIZE
    #define ESP_BUFFER_SIZE 2048
 #elif (ESP_BUFFER_SIZE < 256)
    #error ESP_BUFFER_SIZE parameter is not valid
+#endif
+
+//Maximum digest size
+#if (ESP_HMAC_SUPPORT == ENABLED && ESP_SHA512_SUPPORT == ENABLED)
+   #define ESP_MAX_DIGEST_SIZE 64
+#elif (ESP_HMAC_SUPPORT == ENABLED && ESP_SHA384_SUPPORT == ENABLED)
+   #define ESP_MAX_DIGEST_SIZE 48
+#elif (ESP_HMAC_SUPPORT == ENABLED && ESP_SHA256_SUPPORT == ENABLED)
+   #define ESP_MAX_DIGEST_SIZE 32
+#else
+   #define ESP_MAX_DIGEST_SIZE 12
+#endif
+
+//Maximum size of the ICV field
+#if (ESP_HMAC_SUPPORT == ENABLED && ESP_SHA512_SUPPORT == ENABLED)
+   #define ESP_MAX_ICV_SIZE 32
+#elif (ESP_HMAC_SUPPORT == ENABLED && ESP_SHA384_SUPPORT == ENABLED)
+   #define ESP_MAX_ICV_SIZE 24
+#elif (ESP_HMAC_SUPPORT == ENABLED && ESP_SHA256_SUPPORT == ENABLED)
+   #define ESP_MAX_ICV_SIZE 16
+#else
+   #define ESP_MAX_ICV_SIZE 12
 #endif
 
 //C++ guard

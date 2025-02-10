@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 //Switch to the appropriate trace level
@@ -346,7 +346,7 @@ error_t ikeVerifyChecksum(IkeSaEntry *sa, const uint8_t *message,
    uint8_t mask;
    error_t error;
    const uint8_t *authKey;
-   uint8_t checksum[MAX_HASH_DIGEST_SIZE];
+   uint8_t checksum[IKE_MAX_DIGEST_SIZE];
 
    //The integrity protection key key is obtained from the SK_ai or SK_ar
    //key, whichever is appropriate
@@ -359,29 +359,6 @@ error_t ikeVerifyChecksum(IkeSaEntry *sa, const uint8_t *message,
       authKey = sa->skai;
    }
 
-#if (IKE_HMAC_AUTH_SUPPORT == ENABLED)
-   //HMAC integrity algorithm?
-   if(sa->authHashAlgo != NULL)
-   {
-      HmacContext *hmacContext;
-
-      //Point to the HMAC context
-      hmacContext = &sa->context->hmacContext;
-
-      //Initialize HMAC calculation
-      error = hmacInit(hmacContext, sa->authHashAlgo, authKey, sa->authKeyLen);
-
-      //Check status code
-      if(!error)
-      {
-         //The checksum must be computed over the encrypted message. Its length
-         //is determined by the integrity algorithm negotiated
-         hmacUpdate(hmacContext, message, length);
-         hmacFinal(hmacContext, checksum);
-      }
-   }
-   else
-#endif
 #if (IKE_CMAC_AUTH_SUPPORT == ENABLED)
    //CMAC integrity algorithm?
    if(sa->authAlgoId == IKE_TRANSFORM_ID_AUTH_AES_CMAC_96 &&
@@ -403,6 +380,29 @@ error_t ikeVerifyChecksum(IkeSaEntry *sa, const uint8_t *message,
          //is determined by the integrity algorithm negotiated
          cmacUpdate(cmacContext, message, length);
          cmacFinal(cmacContext, checksum, sa->icvLen);
+      }
+   }
+   else
+#endif
+#if (IKE_HMAC_AUTH_SUPPORT == ENABLED)
+   //HMAC integrity algorithm?
+   if(sa->authHashAlgo != NULL)
+   {
+      HmacContext *hmacContext;
+
+      //Point to the HMAC context
+      hmacContext = &sa->context->hmacContext;
+
+      //Initialize HMAC calculation
+      error = hmacInit(hmacContext, sa->authHashAlgo, authKey, sa->authKeyLen);
+
+      //Check status code
+      if(!error)
+      {
+         //The checksum must be computed over the encrypted message. Its length
+         //is determined by the integrity algorithm negotiated
+         hmacUpdate(hmacContext, message, length);
+         hmacFinal(hmacContext, checksum);
       }
    }
    else

@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 //Switch to the appropriate trace level
@@ -200,8 +200,7 @@ error_t ikeProcessRequest(IkeContext *context, uint8_t *message, size_t length)
                      else if(exchangeType == IKE_EXCHANGE_TYPE_INFORMATIONAL)
                      {
                         //Process INFORMATIONAL request
-                        error = ikeProcessInformationalRequest(sa, message,
-                           length);
+                        error = ikeProcessInfoRequest(sa, message, length);
                      }
                      else
                      {
@@ -329,7 +328,7 @@ error_t ikeProcessResponse(IkeContext *context, uint8_t *message, size_t length)
                   else if(exchangeType == IKE_EXCHANGE_TYPE_INFORMATIONAL)
                   {
                      //Process INFORMATIONAL response
-                     error = ikeProcessInformationalResponse(sa, message, length);
+                     error = ikeProcessInfoResponse(sa, message, length);
                   }
                   else
                   {
@@ -918,7 +917,12 @@ error_t ikeProcessIkeSaInitResponse(IkeSaEntry *sa, const uint8_t *message,
    }
    else
    {
-      //The IKE_SA_INIT exchange has failed
+      //The IKE_SA_INIT response is not valid
+   }
+
+   //Check whether the IKE_SA_INIT exchange has failed
+   if(error)
+   {
       ikeDeleteSaEntry(sa);
    }
 
@@ -1431,6 +1435,9 @@ error_t ikeProcessIkeAuthResponse(IkeSaEntry *sa, const uint8_t *message,
             ikeDeleteChildSaEntry(childSa);
             sa->childSa = NULL;
             childSa = NULL;
+
+            //Request closure of the IKE SA
+            sa->deleteRequest = TRUE;
          }
       }
 
@@ -1492,7 +1499,7 @@ error_t ikeProcessIkeAuthResponse(IkeSaEntry *sa, const uint8_t *message,
       //in a separate INFORMATIONAL exchange, usually with no other payloads.
       //This is an exception for the general rule of not starting new exchanges
       //based on errors in responses (refer to RFC 7296, section 2.21.2)
-      ikeSendInformationalRequest(sa);
+      ikeSendInfoRequest(sa);
    }
    else
    {
@@ -1556,7 +1563,7 @@ error_t ikeProcessCreateChildSaResponse(IkeSaEntry *sa, const uint8_t *message,
  * @return Error code
  **/
 
-error_t ikeProcessInformationalRequest(IkeSaEntry *sa, const uint8_t *message,
+error_t ikeProcessInfoRequest(IkeSaEntry *sa, const uint8_t *message,
    size_t length)
 {
    error_t error;
@@ -1647,7 +1654,7 @@ error_t ikeProcessInformationalRequest(IkeSaEntry *sa, const uint8_t *message,
    } while(0);
 
    //An IKE message flow always consists of a request followed by a response
-   return ikeSendInformationalResponse(sa);
+   return ikeSendInfoResponse(sa);
 }
 
 
@@ -1659,7 +1666,7 @@ error_t ikeProcessInformationalRequest(IkeSaEntry *sa, const uint8_t *message,
  * @return Error code
  **/
 
-error_t ikeProcessInformationalResponse(IkeSaEntry *sa, const uint8_t *message,
+error_t ikeProcessInfoResponse(IkeSaEntry *sa, const uint8_t *message,
    size_t length)
 {
    error_t error;

@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 #ifndef _IKE_H
@@ -301,6 +301,20 @@
    #error IKE_HMAC_AUTH_SUPPORT parameter is not valid
 #endif
 
+//KMAC128 integrity support (experimental)
+#ifndef IKE_KMAC128_AUTH_SUPPORT
+   #define IKE_KMAC128_AUTH_SUPPORT DISABLED
+#elif (IKE_KMAC128_AUTH_SUPPORT != ENABLED && IKE_KMAC128_AUTH_SUPPORT != DISABLED)
+   #error IKE_KMAC128_AUTH_SUPPORT parameter is not valid
+#endif
+
+//KMAC256 integrity support (experimental)
+#ifndef IKE_KMAC256_AUTH_SUPPORT
+   #define IKE_KMAC256_AUTH_SUPPORT DISABLED
+#elif (IKE_KMAC256_AUTH_SUPPORT != ENABLED && IKE_KMAC256_AUTH_SUPPORT != DISABLED)
+   #error IKE_KMAC256_AUTH_SUPPORT parameter is not valid
+#endif
+
 //XCBC-MAC integrity support
 #ifndef IKE_XCBC_MAC_AUTH_SUPPORT
    #define IKE_XCBC_MAC_AUTH_SUPPORT DISABLED
@@ -320,6 +334,20 @@
    #define IKE_HMAC_PRF_SUPPORT ENABLED
 #elif (IKE_HMAC_PRF_SUPPORT != ENABLED && IKE_HMAC_PRF_SUPPORT != DISABLED)
    #error IKE_HMAC_PRF_SUPPORT parameter is not valid
+#endif
+
+//KMAC128 PRF support (experimental)
+#ifndef IKE_KMAC128_PRF_SUPPORT
+   #define IKE_KMAC128_PRF_SUPPORT DISABLED
+#elif (IKE_KMAC128_PRF_SUPPORT != ENABLED && IKE_KMAC128_PRF_SUPPORT != DISABLED)
+   #error IKE_KMAC128_PRF_SUPPORT parameter is not valid
+#endif
+
+//KMAC256 PRF support (experimental)
+#ifndef IKE_KMAC256_PRF_SUPPORT
+   #define IKE_KMAC256_PRF_SUPPORT DISABLED
+#elif (IKE_KMAC256_PRF_SUPPORT != ENABLED && IKE_KMAC256_PRF_SUPPORT != DISABLED)
+   #error IKE_KMAC256_PRF_SUPPORT parameter is not valid
 #endif
 
 //XCBC-MAC PRF support
@@ -392,6 +420,13 @@
    #error IKE_CAMELLIA_256_SUPPORT parameter is not valid
 #endif
 
+//SM4 cipher support (experimental)
+#ifndef IKE_SM4_SUPPORT
+   #define IKE_SM4_SUPPORT DISABLED
+#elif (IKE_SM4_SUPPORT != ENABLED && IKE_SM4_SUPPORT != DISABLED)
+   #error IKE_SM4_SUPPORT parameter is not valid
+#endif
+
 //MD5 hash support (insecure)
 #ifndef IKE_MD5_SUPPORT
    #define IKE_MD5_SUPPORT DISABLED
@@ -425,6 +460,34 @@
    #define IKE_SHA512_SUPPORT ENABLED
 #elif (IKE_SHA512_SUPPORT != ENABLED && IKE_SHA512_SUPPORT != DISABLED)
    #error IKE_SHA512_SUPPORT parameter is not valid
+#endif
+
+//SHA3-256 hash support (experimental)
+#ifndef IKE_SHA3_256_SUPPORT
+   #define IKE_SHA3_256_SUPPORT DISABLED
+#elif (IKE_SHA3_256_SUPPORT != ENABLED && IKE_SHA3_256_SUPPORT != DISABLED)
+   #error IKE_SHA3_256_SUPPORT parameter is not valid
+#endif
+
+//SHA3-384 hash support (experimental)
+#ifndef IKE_SHA3_384_SUPPORT
+   #define IKE_SHA3_384_SUPPORT DISABLED
+#elif (IKE_SHA3_384_SUPPORT != ENABLED && IKE_SHA3_384_SUPPORT != DISABLED)
+   #error IKE_SHA3_384_SUPPORT parameter is not valid
+#endif
+
+//SHA3-512 hash support (experimental)
+#ifndef IKE_SHA3_512_SUPPORT
+   #define IKE_SHA3_512_SUPPORT DISABLED
+#elif (IKE_SHA3_512_SUPPORT != ENABLED && IKE_SHA3_512_SUPPORT != DISABLED)
+   #error IKE_SHA3_512_SUPPORT parameter is not valid
+#endif
+
+//SM3 hash support (experimental)
+#ifndef IKE_SM3_SUPPORT
+   #define IKE_SM3_SUPPORT DISABLED
+#elif (IKE_SM3_SUPPORT != ENABLED && IKE_SM3_SUPPORT != DISABLED)
+   #error IKE_SM3_SUPPORT parameter is not valid
 #endif
 
 //Tiger hash support
@@ -474,6 +537,13 @@
    #define IKE_ECDSA_SIGN_SUPPORT ENABLED
 #elif (IKE_ECDSA_SIGN_SUPPORT != ENABLED && IKE_ECDSA_SIGN_SUPPORT != DISABLED)
    #error IKE_ECDSA_SIGN_SUPPORT parameter is not valid
+#endif
+
+//SM2 signature capability (experimental)
+#ifndef IKE_SM2_SIGN_SUPPORT
+   #define IKE_SM2_SIGN_SUPPORT DISABLED
+#elif (IKE_SM2_SIGN_SUPPORT != ENABLED && IKE_SM2_SIGN_SUPPORT != DISABLED)
+   #error IKE_SM2_SIGN_SUPPORT parameter is not valid
 #endif
 
 //Ed25519 signature support
@@ -553,6 +623,13 @@
    #error IKE_BRAINPOOLP512R1_SUPPORT parameter is not valid
 #endif
 
+//SM2 elliptic curve support (experimental)
+#ifndef IKE_SM2_SUPPORT
+   #define IKE_SM2_SUPPORT DISABLED
+#elif (IKE_SM2_SUPPORT != ENABLED && IKE_SM2_SUPPORT != DISABLED)
+   #error IKE_SM2_SUPPORT parameter is not valid
+#endif
+
 //Curve25519 elliptic curve support
 #ifndef IKE_CURVE25519_SUPPORT
    #define IKE_CURVE25519_SUPPORT ENABLED
@@ -565,6 +642,27 @@
    #define IKE_CURVE448_SUPPORT DISABLED
 #elif (IKE_CURVE448_SUPPORT != ENABLED && IKE_CURVE448_SUPPORT != DISABLED)
    #error IKE_CURVE448_SUPPORT parameter is not valid
+#endif
+
+//ML-KEM-512 key encapsulation mechanism support (experimental)
+#ifndef IKE_MLKEM512_SUPPORT
+   #define IKE_MLKEM512_SUPPORT DISABLED
+#elif (IKE_MLKEM512_SUPPORT != ENABLED && IKE_MLKEM512_SUPPORT != DISABLED)
+   #error IKE_MLKEM512_SUPPORT parameter is not valid
+#endif
+
+//ML-KEM-768 key encapsulation mechanism support (experimental)
+#ifndef IKE_MLKEM768_SUPPORT
+   #define IKE_MLKEM768_SUPPORT DISABLED
+#elif (IKE_MLKEM768_SUPPORT != ENABLED && IKE_MLKEM768_SUPPORT != DISABLED)
+   #error IKE_MLKEM768_SUPPORT parameter is not valid
+#endif
+
+//ML-KEM-1024 key encapsulation mechanism support (experimental)
+#ifndef IKE_MLKEM1024_SUPPORT
+   #define IKE_MLKEM1024_SUPPORT DISABLED
+#elif (IKE_MLKEM1024_SUPPORT != ENABLED && IKE_MLKEM1024_SUPPORT != DISABLED)
+   #error IKE_MLKEM1024_SUPPORT parameter is not valid
 #endif
 
 //Minimum acceptable size for Diffie-Hellman prime modulus
@@ -631,6 +729,26 @@
 //Deallocate memory block
 #ifndef ikeFreeMem
    #define ikeFreeMem(p) osFreeMem(p)
+#endif
+
+//Maximum digest size
+#if (IKE_SHA512_SUPPORT == ENABLED)
+   #define IKE_MAX_DIGEST_SIZE 64
+#elif (IKE_SHA384_SUPPORT == ENABLED)
+   #define IKE_MAX_DIGEST_SIZE 48
+#else
+   #define IKE_MAX_DIGEST_SIZE 32
+#endif
+
+//Maximum size of the ICV field
+#if (IKE_HMAC_AUTH_SUPPORT == ENABLED && IKE_SHA512_SUPPORT == ENABLED)
+   #define IKE_MAX_ICV_SIZE 32
+#elif (IKE_HMAC_AUTH_SUPPORT == ENABLED && IKE_SHA384_SUPPORT == ENABLED)
+   #define IKE_MAX_ICV_SIZE 24
+#elif (IKE_HMAC_AUTH_SUPPORT == ENABLED && IKE_SHA256_SUPPORT == ENABLED)
+   #define IKE_MAX_ICV_SIZE 16
+#else
+   #define IKE_MAX_ICV_SIZE 12
 #endif
 
 //Maximum shared secret length (Diffie-Hellman key exchange)
@@ -823,7 +941,7 @@ typedef enum
    IKE_TRANSFORM_ID_ENCR_KUZNYECHIK_MGM_KTREE     = 32,
    IKE_TRANSFORM_ID_ENCR_MAGMA_MGM_KTREE          = 33,
    IKE_TRANSFORM_ID_ENCR_KUZNYECHIK_MGM_MAC_KTREE = 34,
-   IKE_TRANSFORM_ID_ENCR_MAGMA_MGM_MAC_KTREE      = 35
+   IKE_TRANSFORM_ID_ENCR_MAGMA_MGM_MAC_KTREE      = 35,
 } IkeTransformIdEncr;
 
 
@@ -842,7 +960,7 @@ typedef enum
    IKE_TRANSFORM_ID_PRF_HMAC_SHA2_384     = 6,
    IKE_TRANSFORM_ID_PRF_HMAC_SHA2_512     = 7,
    IKE_TRANSFORM_ID_PRF_AES128_CMAC       = 8,
-   IKE_TRANSFORM_ID_PRF_HMAC_STREEBOG_512 = 9
+   IKE_TRANSFORM_ID_PRF_HMAC_STREEBOG_512 = 9,
 } IkeTransformIdPrf;
 
 
@@ -866,7 +984,7 @@ typedef enum
    IKE_TRANSFORM_ID_AUTH_AES_256_GMAC      = 11,
    IKE_TRANSFORM_ID_AUTH_HMAC_SHA2_256_128 = 12,
    IKE_TRANSFORM_ID_AUTH_HMAC_SHA2_384_192 = 13,
-   IKE_TRANSFORM_ID_AUTH_HMAC_SHA2_512_256 = 14
+   IKE_TRANSFORM_ID_AUTH_HMAC_SHA2_512_256 = 14,
 } IkeTransformIdAuth;
 
 
@@ -897,10 +1015,13 @@ typedef enum
    IKE_TRANSFORM_ID_DH_GROUP_BRAINPOOLP256R1   = 28, ///<256-bit Brainpool ECP Group
    IKE_TRANSFORM_ID_DH_GROUP_BRAINPOOLP384R1   = 29, ///<384-bit Brainpool ECP Group
    IKE_TRANSFORM_ID_DH_GROUP_BRAINPOOLP512R1   = 30, ///<512-bit Brainpool ECP Group
-   IKE_TRANSFORM_ID_DH_GROUP_CURVE25519        = 31, ///<Curve25519
-   IKE_TRANSFORM_ID_DH_GROUP_CURVE448          = 32, ///<Curve448
-   IKE_TRANSFORM_ID_DH_GROUP_GOST3410_2012_256 = 32, ///<GOST3410_2012_256
-   IKE_TRANSFORM_ID_DH_GROUP_GOST3410_2012_512 = 32  ///<GOST3410_2012_512
+   IKE_TRANSFORM_ID_DH_GROUP_CURVE25519        = 31, ///<curve25519
+   IKE_TRANSFORM_ID_DH_GROUP_CURVE448          = 32, ///<curve448
+   IKE_TRANSFORM_ID_DH_GROUP_GOST3410_2012_256 = 33, ///<GOST3410_2012_256
+   IKE_TRANSFORM_ID_DH_GROUP_GOST3410_2012_512 = 34, ///<GOST3410_2012_512
+   IKE_TRANSFORM_ID_DH_GROUP_ML_KEM_512        = 35, ///<ML-KEM-512
+   IKE_TRANSFORM_ID_DH_GROUP_ML_KEM_768        = 36, ///<ML-KEM-768
+   IKE_TRANSFORM_ID_DH_GROUP_ML_KEM_1024       = 37, ///<ML-KEM-1024
 } IkeTransformIdDhGroup;
 
 
@@ -1206,11 +1327,13 @@ typedef enum
 
 typedef enum
 {
-   IKE_HASH_ALGO_SHA1     = 1,
-   IKE_HASH_ALGO_SHA256   = 2,
-   IKE_HASH_ALGO_SHA384   = 3,
-   IKE_HASH_ALGO_SHA512   = 4,
-   IKE_HASH_ALGO_IDENTITY = 5
+   IKE_HASH_ALGO_SHA1         = 1,
+   IKE_HASH_ALGO_SHA256       = 2,
+   IKE_HASH_ALGO_SHA384       = 3,
+   IKE_HASH_ALGO_SHA512       = 4,
+   IKE_HASH_ALGO_IDENTITY     = 5,
+   IKE_HASH_ALGO_STREEBOG_256 = 6,
+   IKE_HASH_ALGO_STREEBOG_512 = 7,
 } IkeHashAlgo;
 
 
@@ -1230,8 +1353,9 @@ typedef enum
    IKE_CERT_TYPE_ECDSA_BRAINPOOLP256R1 = 7,
    IKE_CERT_TYPE_ECDSA_BRAINPOOLP384R1 = 8,
    IKE_CERT_TYPE_ECDSA_BRAINPOOLP512R1 = 9,
-   IKE_CERT_TYPE_ED25519               = 10,
-   IKE_CERT_TYPE_ED448                 = 11
+   IKE_CERT_TYPE_SM2                   = 10,
+   IKE_CERT_TYPE_ED25519               = 11,
+   IKE_CERT_TYPE_ED448                 = 12
 } IkeCertType;
 
 
@@ -1812,52 +1936,52 @@ typedef struct
 
 struct _IkeContext
 {
-   bool_t running;                        ///<Operational state of IKEv2
-   bool_t stop;                           ///<Stop request
-   OsEvent event;                         ///<Event object used to poll the underlying socket
-   OsTaskParameters taskParams;           ///<Task parameters
-   OsTaskId taskId;                       ///<Task identifier
-   NetInterface *interface;               ///<Underlying network interface
-   const PrngAlgo *prngAlgo;              ///<Pseudo-random number generator to be used
-   void *prngContext;                     ///<Pseudo-random number generator context
-   systime_t saLifetime;                  ///<Lifetime of IKE SAs
-   systime_t childSaLifetime;             ///<Lifetime of Child SAs
-   systime_t reauthPeriod;                ///<Reauthentication period
+   bool_t running;                            ///<Operational state of IKEv2
+   bool_t stop;                               ///<Stop request
+   OsEvent event;                             ///<Event object used to poll the underlying socket
+   OsTaskParameters taskParams;               ///<Task parameters
+   OsTaskId taskId;                           ///<Task identifier
+   NetInterface *interface;                   ///<Underlying network interface
+   const PrngAlgo *prngAlgo;                  ///<Pseudo-random number generator to be used
+   void *prngContext;                         ///<Pseudo-random number generator context
+   systime_t saLifetime;                      ///<Lifetime of IKE SAs
+   systime_t childSaLifetime;                 ///<Lifetime of Child SAs
+   systime_t reauthPeriod;                    ///<Reauthentication period
 #if (IKE_DPD_SUPPORT == ENABLED)
-   systime_t dpdPeriod;                   ///<Dead peer detection period
+   systime_t dpdPeriod;                       ///<Dead peer detection period
 #endif
-   uint16_t preferredDhGroupNum;          ///<Preferred Diffie-Hellman group number
-   IkeIdType idType;                      ///<ID type
-   uint8_t id[IKE_MAX_ID_LEN];            ///<ID
-   size_t idLen;                          ///<Length of the ID, in bytes
-   uint8_t psk[IKE_MAX_PSK_LEN];          ///<Pre-shared key
-   size_t pskLen;                         ///<Length of the pre-shared key, in bytes
-   IkeCertType certType;                  ///<Certificate type
-   const char_t *certChain;               ///<Entity's certificate chain (PEM format)
-   size_t certChainLen;                   ///<Length of the certificate chain
-   const char_t *privateKey;              ///<Entity's private key (PEM format)
-   size_t privateKeyLen;                  ///<Length of the private key
-   char_t password[IKE_MAX_PASSWORD_LEN]; ///<Password used to decrypt the private key
+   uint16_t preferredDhGroupNum;              ///<Preferred Diffie-Hellman group number
+   IkeIdType idType;                          ///<ID type
+   uint8_t id[IKE_MAX_ID_LEN];                ///<ID
+   size_t idLen;                              ///<Length of the ID, in bytes
+   uint8_t psk[IKE_MAX_PSK_LEN];              ///<Pre-shared key
+   size_t pskLen;                             ///<Length of the pre-shared key, in bytes
+   IkeCertType certType;                      ///<Certificate type
+   const char_t *certChain;                   ///<Entity's certificate chain (PEM format)
+   size_t certChainLen;                       ///<Length of the certificate chain
+   const char_t *privateKey;                  ///<Entity's private key (PEM format)
+   size_t privateKeyLen;                      ///<Length of the private key
+   char_t password[IKE_MAX_PASSWORD_LEN + 1]; ///<Password used to decrypt the private key
 
-   Socket *socket;                        ///<Underlying UDP socket
-   IpAddr localIpAddr;                    ///<Destination IP address of the received IKE message
-   IpAddr remoteIpAddr;                   ///<Source IP address of the received IKE message
-   uint16_t remotePort;                   ///<Source port of the received IKE message
-   IkeSaEntry *sa;                        ///<IKE SA entries
-   uint_t numSaEntries;                   ///<Number of IKE SA entries
-   IkeChildSaEntry *childSa;              ///<Child SA entries
-   uint_t numChildSaEntries;              ///<Number of Child SA entries
-   uint8_t message[IKE_MAX_MSG_SIZE];     ///<Incoming IKE message
-   size_t messageLen;                     ///<Length of the incoming IKE message, in bytes
+   Socket *socket;                            ///<Underlying UDP socket
+   IpAddr localIpAddr;                        ///<Destination IP address of the received IKE message
+   IpAddr remoteIpAddr;                       ///<Source IP address of the received IKE message
+   uint16_t remotePort;                       ///<Source port of the received IKE message
+   IkeSaEntry *sa;                            ///<IKE SA entries
+   uint_t numSaEntries;                       ///<Number of IKE SA entries
+   IkeChildSaEntry *childSa;                  ///<Child SA entries
+   uint_t numChildSaEntries;                  ///<Number of Child SA entries
+   uint8_t message[IKE_MAX_MSG_SIZE];         ///<Incoming IKE message
+   size_t messageLen;                         ///<Length of the incoming IKE message, in bytes
 
 #if (IKE_CMAC_AUTH_SUPPORT == ENABLED || IKE_CMAC_PRF_SUPPORT == ENABLED)
-   CmacContext cmacContext;               ///<CMAC context
+   CmacContext cmacContext;                   ///<CMAC context
 #endif
 #if (IKE_HMAC_AUTH_SUPPORT == ENABLED || IKE_HMAC_PRF_SUPPORT == ENABLED)
-   HmacContext hmacContext;               ///<HMAC context
+   HmacContext hmacContext;                   ///<HMAC context
 #endif
 #if (IKE_XCBC_MAC_AUTH_SUPPORT == ENABLED || IKE_XCBC_MAC_PRF_SUPPORT == ENABLED)
-   XcbcMacContext xcbcMacContext;         ///<XCBC-MAC context
+   XcbcMacContext xcbcMacContext;             ///<XCBC-MAC context
 #endif
 
 #if (IKE_COOKIE_SUPPORT == ENABLED)

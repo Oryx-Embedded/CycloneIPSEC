@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 //Switch to the appropriate trace level
@@ -255,8 +255,12 @@ error_t ikeSendIkeAuthRequest(IkeSaEntry *sa)
    //Check status code
    if(!error)
    {
-      //Generate a new SPI for the Child SA
-      error = ikeGenerateChildSaSpi(sa->childSa, sa->childSa->localSpi);
+      //Valid Child SA?
+      if(sa->childSa != NULL)
+      {
+         //Generate a new SPI for the Child SA
+         error = ikeGenerateChildSaSpi(sa->childSa, sa->childSa->localSpi);
+      }
    }
 
    //Check status code
@@ -507,7 +511,7 @@ error_t ikeSendCreateChildSaResponse(IkeSaEntry *sa, IkeChildSaEntry *childSa)
  * @return Error code
  **/
 
-error_t ikeSendInformationalRequest(IkeSaEntry *sa)
+error_t ikeSendInfoRequest(IkeSaEntry *sa)
 {
    error_t error;
    IkeContext *context;
@@ -519,7 +523,7 @@ error_t ikeSendInformationalRequest(IkeSaEntry *sa)
    sa->txMessageId++;
 
    //Format INFORMATIONAL request
-   error = ikeFormatInformationalRequest(sa, sa->request, &sa->requestLen);
+   error = ikeFormatInfoRequest(sa, sa->request, &sa->requestLen);
 
    //Check status code
    if(!error)
@@ -576,7 +580,7 @@ error_t ikeSendInformationalRequest(IkeSaEntry *sa)
  * @return Error code
  **/
 
-error_t ikeSendInformationalResponse(IkeSaEntry *sa)
+error_t ikeSendInfoResponse(IkeSaEntry *sa)
 {
    error_t error;
    uint_t i;
@@ -587,7 +591,7 @@ error_t ikeSendInformationalResponse(IkeSaEntry *sa)
    context = sa->context;
 
    //Format INFORMATIONAL response
-   error = ikeFormatInformationalResponse(sa, sa->response, &sa->responseLen);
+   error = ikeFormatInfoResponse(sa, sa->response, &sa->responseLen);
 
    //Check status code
    if(!error)
@@ -1243,12 +1247,16 @@ error_t ikeFormatIkeAuthResponse(IkeSaEntry *sa, uint8_t *p, size_t *length)
       }
       else
       {
-         //The Child SA creation has failed
-         error = ikeFormatNotifyPayload(sa, NULL, sa->notifyMsgType, p, &n,
-            &nextPayload);
+         //Check whether the Child SA creation has failed
+         if(sa->notifyMsgType != IKE_NOTIFY_MSG_TYPE_NONE)
+         {
+            //Format Notify payload
+            error = ikeFormatNotifyPayload(sa, NULL, sa->notifyMsgType, p, &n,
+               &nextPayload);
 
-         //Total length of the message
-         *length += n;
+            //Total length of the message
+            *length += n;
+         }
       }
    }
    else
@@ -1367,7 +1375,7 @@ error_t ikeFormatCreateChildSaResponse(IkeSaEntry *sa, IkeChildSaEntry *childSa,
  * @return Error code
  **/
 
-error_t ikeFormatInformationalRequest(IkeSaEntry *sa, uint8_t *p,
+error_t ikeFormatInfoRequest(IkeSaEntry *sa, uint8_t *p,
    size_t *length)
 {
    error_t error;
@@ -1464,7 +1472,7 @@ error_t ikeFormatInformationalRequest(IkeSaEntry *sa, uint8_t *p,
  * @return Error code
  **/
 
-error_t ikeFormatInformationalResponse(IkeSaEntry *sa, uint8_t *p,
+error_t ikeFormatInfoResponse(IkeSaEntry *sa, uint8_t *p,
    size_t *length)
 {
    uint_t i;

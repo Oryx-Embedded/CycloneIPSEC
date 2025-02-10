@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 //Switch to the appropriate trace level
@@ -128,6 +128,7 @@ void ikeChangeChildSaState(IkeChildSaEntry *childSa, IkeChildSaState newState)
 
 void ikeProcessEvents(IkeContext *context)
 {
+   error_t error;
    uint_t i;
    systime_t time;
    IkeSaEntry *sa;
@@ -147,7 +148,14 @@ void ikeProcessEvents(IkeContext *context)
       {
          //Communication using IKE always begins with IKE_SA_INIT and IKE_AUTH
          //exchanges. These initial exchanges normally consist of four messages
-         ikeProcessSaInitEvent(sa);
+         error = ikeProcessSaInitEvent(sa);
+
+         //Check status code code
+         if(error)
+         {
+            //Delete the IKE SA
+            ikeDeleteSaEntry(sa);
+         }
       }
       else if(sa->state == IKE_SA_STATE_AUTH_REQ)
       {
@@ -369,37 +377,72 @@ error_t ikeProcessChildSaEvents(IkeChildSaEntry *childSa)
 error_t ikeProcessSaInitEvent(IkeSaEntry *sa)
 {
    error_t error;
+   bool_t valid;
    IkeContext *context;
 
    //Point to the IKE context
    context = sa->context;
 
-   //Each endpoint chooses one of the two SPIs and must choose them so as to
-   //be unique identifiers of an IKE SA (refer to RFC 7296, section 2.6)
-   error = ikeGenerateSaSpi(sa, sa->initiatorSpi);
+   //Initialize flag
+   valid = FALSE;
 
-   //Check status code
-   if(!error)
+   //Valid entity's ID
+   if(context->idType != IKE_ID_TYPE_INVALID)
    {
-      //Nonces used in IKEv2 must be randomly chosen and must be at least
-      //128 bits in size (refer to RFC 7296, section 2.10)
-      error = ikeGenerateNonce(context, sa->initiatorNonce,
-         &sa->initiatorNonceLen);
+#if (IKE_PSK_AUTH_SUPPORT == ENABLED)
+      //Pre-shared key authentication?
+      if(context->pskLen > 0)
+      {
+         valid = TRUE;
+      }
+#endif
+   }
+   else
+   {
+#if (IKE_CERT_AUTH_SUPPORT == ENABLED)
+      //Certificate authentication?
+      if(context->certChain != NULL && context->certChainLen > 0)
+      {
+         valid = TRUE;
+      }
+#endif
    }
 
-   //Check status code
-   if(!error)
+   //Valid credentials?
+   if(valid)
    {
-      //Generate an ephemeral key pair
-      error = ikeGenerateDhKeyPair(sa);
-   }
+      //Each endpoint chooses one of the two SPIs and must choose them so as to
+      //be unique identifiers of an IKE SA (refer to RFC 7296, section 2.6)
+      error = ikeGenerateSaSpi(sa, sa->initiatorSpi);
 
-   //Check status code
-   if(!error)
+      //Check status code
+      if(!error)
+      {
+         //Nonces used in IKEv2 must be randomly chosen and must be at least
+         //128 bits in size (refer to RFC 7296, section 2.10)
+         error = ikeGenerateNonce(context, sa->initiatorNonce,
+            &sa->initiatorNonceLen);
+      }
+
+      //Check status code
+      if(!error)
+      {
+         //Generate an ephemeral key pair
+         error = ikeGenerateDhKeyPair(sa);
+      }
+
+      //Check status code
+      if(!error)
+      {
+         //The first exchange of an IKE session, IKE_SA_INIT, negotiates security
+         //parameters for the IKE SA, sends nonces, and sends Diffie-Hellman values
+         error = ikeSendIkeSaInitRequest(sa);
+      }
+   }
+   else
    {
-      //The first exchange of an IKE session, IKE_SA_INIT, negotiates security
-      //parameters for the IKE SA, sends nonces, and sends Diffie-Hellman values
-      error = ikeSendIkeSaInitRequest(sa);
+      //No valid credentials provided
+      error = ERROR_NOT_CONFIGURED;
    }
 
    //Return status code
@@ -423,7 +466,7 @@ error_t ikeProcessSaDpdEvent(IkeSaEntry *sa)
 
    //An INFORMATIONAL request with no payloads is commonly used as a check
    //for liveness (refer to RFC 7296, section 1)
-   return ikeSendInformationalRequest(sa);
+   return ikeSendInfoRequest(sa);
 }
 
 
@@ -657,7 +700,7 @@ error_t ikeProcessSaDeleteEvent(IkeSaEntry *sa)
 
    //To delete an SA, an INFORMATIONAL exchange with one or more Delete payloads
    //is sent listing the SPIs of the SAs to be deleted
-   return ikeSendInformationalRequest(sa);
+   return ikeSendInfoRequest(sa);
 }
 
 
@@ -703,11 +746,8 @@ error_t ikeProcessChildSaInitEvent(IkeChildSaEntry *childSa)
 
          //Update the state of the IKE SA
          ikeChangeSaState(sa, IKE_SA_STATE_INIT_REQ);
-
-         //The first exchange of an IKE session, IKE_SA_INIT, negotiates
-         //security parameters for the IKE SA, sends nonces, and sends
-         //Diffie-Hellman values
-         error = ikeProcessSaInitEvent(sa);
+         //Notify the IKE context that the IKE SA should be created
+         osSetEvent(&context->event);
       }
       else
       {
@@ -823,7 +863,7 @@ error_t ikeProcessChildSaDeleteEvent(IkeChildSaEntry *childSa)
 
    //To delete an SA, an INFORMATIONAL exchange with one or more Delete payloads
    //is sent listing the SPIs of the SAs to be deleted
-   return ikeSendInformationalRequest(sa);
+   return ikeSendInfoRequest(sa);
 }
 
 #endif

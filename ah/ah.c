@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 //Switch to the appropriate trace level
@@ -287,75 +287,6 @@ error_t ahGenerateIcv(IpsecSadEntry *sa, const Ipv4Header *ipv4Header,
    if(context == NULL)
       return ERROR_FAILURE;
 
-#if (AH_HMAC_SUPPORT == ENABLED)
-   //HMAC integrity algorithm?
-   if(sa->authHashAlgo != NULL)
-   {
-      HmacContext *hmacContext;
-
-      //Point to the HMAC context
-      hmacContext = &context->hmacContext;
-
-      //The SAD entry specifies the algorithm employed for ICV computation
-      error = hmacInit(hmacContext, sa->authHashAlgo, sa->authKey,
-         sa->authKeyLen);
-      //Any error to report?
-      if(error)
-         return error;
-
-      //Compute HMAC over the IP or extension header fields before the AH
-      //header that are either immutable in transit or that are predictable
-      //in value upon arrival at the endpoint for the AH SA
-      hmacUpdate(hmacContext, ipv4Header, sizeof(Ipv4Header));
-
-      //Compute HMAC over the Next Header, Payload Length, Reserved, SPI,
-      //Sequence Number (low-order 32 bits) fields, and the ICV (which is set
-      //to zero for this computation)
-      hmacUpdate(hmacContext, ahHeader, sizeof(AhHeader) + sa->icvLen);
-
-      //Everything after AH is assumed to be immutable in transit
-      for(i = 0; i < buffer->chunkCount; i++)
-      {
-         //Is there any data to process from the current chunk?
-         if(offset < buffer->chunk[i].length)
-         {
-            //Point to the first byte to be processed
-            p = (uint8_t *) buffer->chunk[i].address + offset;
-            //Compute the number of bytes to process at a time
-            n = buffer->chunk[i].length - offset;
-
-            //Update HMAC calculation
-            hmacUpdate(hmacContext, p, n);
-
-            //Process the next block from the start
-            offset = 0;
-         }
-         else
-         {
-            //Skip the current chunk
-            offset -= buffer->chunk[i].length;
-         }
-      }
-
-      //Extended sequence numbers?
-      if(sa->esn)
-      {
-         //If the ESN option is elected for an SA, then the high-order 32 bits
-         //of the ESN must be included in the ICV computation
-         uint32_t seqh = htonl(sa->seqNum >> 32);
-
-         //For purposes of ICV computation, these bits are appended (implicitly)
-         //immediately after the end of the payload
-         hmacUpdate(hmacContext, (uint8_t *) &seqh, 4);
-      }
-
-      //Finalize HMAC calculation
-      hmacFinal(hmacContext, NULL);
-      //The output of the HMAC can be truncated
-      osMemcpy(ahHeader->icv, hmacContext->digest, sa->icvLen);
-   }
-   else
-#endif
 #if (AH_CMAC_SUPPORT == ENABLED)
    //CMAC integrity algorithm?
    if(sa->authCipherAlgo != NULL)
@@ -368,69 +299,140 @@ error_t ahGenerateIcv(IpsecSadEntry *sa, const Ipv4Header *ipv4Header,
       //The SAD entry specifies the algorithm employed for ICV computation
       error = cmacInit(cmacContext, sa->authCipherAlgo, sa->authKey,
          sa->authKeyLen);
-      //Any error to report?
-      if(error)
-         return error;
 
-      //Compute CMAC over the IP or extension header fields before the AH
-      //header that are either immutable in transit or that are predictable
-      //in value upon arrival at the endpoint for the AH SA
-      cmacUpdate(cmacContext, ipv4Header, sizeof(Ipv4Header));
-
-      //Compute HMAC over the Next Header, Payload Length, Reserved, SPI,
-      //Sequence Number (low-order 32 bits) fields, and the ICV (which is set
-      //to zero for this computation)
-      cmacUpdate(cmacContext, ahHeader, sizeof(AhHeader) + sa->icvLen);
-
-      //Everything after AH is assumed to be immutable in transit
-      for(i = 0; i < buffer->chunkCount; i++)
+      //Check status code
+      if(!error)
       {
-         //Is there any data to process from the current chunk?
-         if(offset < buffer->chunk[i].length)
-         {
-            //Point to the first byte to be processed
-            p = (uint8_t *) buffer->chunk[i].address + offset;
-            //Compute the number of bytes to process at a time
-            n = buffer->chunk[i].length - offset;
+         //Compute CMAC over the IP or extension header fields before the AH
+         //header that are either immutable in transit or that are predictable
+         //in value upon arrival at the endpoint for the AH SA
+         cmacUpdate(cmacContext, ipv4Header, sizeof(Ipv4Header));
 
-            //Update CMAC calculation
-            cmacUpdate(cmacContext, p, n);
+         //Compute CMAC over the Next Header, Payload Length, Reserved, SPI,
+         //Sequence Number (low-order 32 bits) fields, and the ICV (which is
+         //set to zero for this computation)
+         cmacUpdate(cmacContext, ahHeader, sizeof(AhHeader) + sa->icvLen);
 
-            //Process the next block from the start
-            offset = 0;
-         }
-         else
+         //Everything after AH is assumed to be immutable in transit
+         for(i = 0; i < buffer->chunkCount; i++)
          {
-            //Skip the current chunk
-            offset -= buffer->chunk[i].length;
+            //Is there any data to process from the current chunk?
+            if(offset < buffer->chunk[i].length)
+            {
+               //Point to the first byte to be processed
+               p = (uint8_t *) buffer->chunk[i].address + offset;
+               //Compute the number of bytes to process at a time
+               n = buffer->chunk[i].length - offset;
+
+               //Update CMAC calculation
+               cmacUpdate(cmacContext, p, n);
+
+               //Process the next block from the start
+               offset = 0;
+            }
+            else
+            {
+               //Skip the current chunk
+               offset -= buffer->chunk[i].length;
+            }
          }
+
+         //Extended sequence numbers?
+         if(sa->esn)
+         {
+            //If the ESN option is elected for an SA, then the high-order 32
+            //bits of the ESN must be included in the ICV computation
+            uint32_t seqh = htonl(sa->seqNum >> 32);
+
+            //For purposes of ICV computation, these bits are appended
+            //(implicitly) immediately after the end of the payload
+            cmacUpdate(cmacContext, (uint8_t *) &seqh, 4);
+         }
+
+         //Finalize CMAC calculation
+         cmacFinal(cmacContext, ahHeader->icv, sa->icvLen);
       }
+   }
+   else
+#endif
+#if (AH_HMAC_SUPPORT == ENABLED)
+   //HMAC integrity algorithm?
+   if(sa->authHashAlgo != NULL)
+   {
+      HmacContext *hmacContext;
 
-      //Extended sequence numbers?
-      if(sa->esn)
+      //Point to the HMAC context
+      hmacContext = &context->hmacContext;
+
+      //The SAD entry specifies the algorithm employed for ICV computation
+      error = hmacInit(hmacContext, sa->authHashAlgo, sa->authKey,
+         sa->authKeyLen);
+
+      //Check status code
+      if(!error)
       {
-         //If the ESN option is elected for an SA, then the high-order 32 bits
-         //of the ESN must be included in the ICV computation
-         uint32_t seqh = htonl(sa->seqNum >> 32);
+         //Compute HMAC over the IP or extension header fields before the AH
+         //header that are either immutable in transit or that are predictable
+         //in value upon arrival at the endpoint for the AH SA
+         hmacUpdate(hmacContext, ipv4Header, sizeof(Ipv4Header));
 
-         //For purposes of ICV computation, these bits are appended (implicitly)
-         //immediately after the end of the payload
-         cmacUpdate(cmacContext, (uint8_t *) &seqh, 4);
+         //Compute HMAC over the Next Header, Payload Length, Reserved, SPI,
+         //Sequence Number (low-order 32 bits) fields, and the ICV (which is
+         //set to zero for this computation)
+         hmacUpdate(hmacContext, ahHeader, sizeof(AhHeader) + sa->icvLen);
+
+         //Everything after AH is assumed to be immutable in transit
+         for(i = 0; i < buffer->chunkCount; i++)
+         {
+            //Is there any data to process from the current chunk?
+            if(offset < buffer->chunk[i].length)
+            {
+               //Point to the first byte to be processed
+               p = (uint8_t *) buffer->chunk[i].address + offset;
+               //Compute the number of bytes to process at a time
+               n = buffer->chunk[i].length - offset;
+
+               //Update HMAC calculation
+               hmacUpdate(hmacContext, p, n);
+
+               //Process the next block from the start
+               offset = 0;
+            }
+            else
+            {
+               //Skip the current chunk
+               offset -= buffer->chunk[i].length;
+            }
+         }
+
+         //Extended sequence numbers?
+         if(sa->esn)
+         {
+            //If the ESN option is elected for an SA, then the high-order 32
+            //bits of the ESN must be included in the ICV computation
+            uint32_t seqh = htonl(sa->seqNum >> 32);
+
+            //For purposes of ICV computation, these bits are appended
+            //(implicitly) immediately after the end of the payload
+            hmacUpdate(hmacContext, (uint8_t *) &seqh, 4);
+         }
+
+         //Finalize HMAC calculation
+         hmacFinal(hmacContext, NULL);
+         //The output of the HMAC can be truncated
+         osMemcpy(ahHeader->icv, hmacContext->digest, sa->icvLen);
       }
-
-      //Finalize CMAC calculation
-      cmacFinal(cmacContext, ahHeader->icv, sa->icvLen);
    }
    else
 #endif
    //Unknown integrity algorithm?
    {
       //Report an error
-      return ERROR_FAILURE;
+      error = ERROR_FAILURE;
    }
 
-   //Successful processing
-   return NO_ERROR;
+   //Return status code
+   return error;
 }
 
 
@@ -456,6 +458,7 @@ error_t ahVerifyIcv(IpsecSadEntry *sa, const Ipv4Header *ipv4Header,
    Ipv4Header *ipv4Header2;
    AhHeader *ahHeader2;
    uint8_t temp[IPV4_MAX_HEADER_LENGTH];
+   uint8_t checksum[AH_MAX_DIGEST_SIZE];
 
    //Point to the IPsec context
    context = netContext.ipsecContext;
@@ -480,99 +483,6 @@ error_t ahVerifyIcv(IpsecSadEntry *sa, const Ipv4Header *ipv4Header,
    //Mutable options are zeroed before performing the ICV calculation
    ahProcessMutableIpv4Options(ipv4Header2);
 
-#if (AH_HMAC_SUPPORT == ENABLED)
-   //HMAC integrity algorithm?
-   if(sa->authHashAlgo != NULL)
-   {
-      HmacContext *hmacContext;
-
-      //Point to the HMAC context
-      hmacContext = &context->hmacContext;
-
-      //The SAD entry specifies the algorithm employed for ICV computation,
-      //and indicates the key required to validate the ICV
-      error = hmacInit(hmacContext, sa->authHashAlgo, sa->authKey,
-         sa->authKeyLen);
-      //Any error to report?
-      if(error)
-         return error;
-
-      //Compute HMAC over the IP or extension header fields before the AH
-      //header that are either immutable in transit or that are predictable
-      //in value upon arrival at the endpoint for the AH SA
-      hmacUpdate(hmacContext, temp, n);
-
-      //The Payload Length field specifies the length of AH header in 32-bit
-      //words (4-byte units), minus 2
-      n = (ahHeader->payloadLen + 2) * 4;
-
-      //Copy the AH header
-      osMemcpy(temp, ahHeader, n);
-      //Point to the AH header
-      ahHeader2 = (AhHeader *) temp;
-
-      //The Integrity Check Value field is also set to zero in preparation for
-      //this computation (refer to RFC 4302, section 3.3.3.1)
-      osMemset(ahHeader2->icv, 0, sa->icvLen);
-
-      //Compute HMAC over the Next Header, Payload Length, Reserved, SPI,
-      //Sequence Number (low-order 32 bits) fields, and the ICV (which is set
-      //to zero for this computation)
-      hmacUpdate(hmacContext, temp, n);
-
-      //Everything after AH is assumed to be immutable in transit
-      for(i = 0; i < buffer->chunkCount; i++)
-      {
-         //Is there any data to process from the current chunk?
-         if(offset < buffer->chunk[i].length)
-         {
-            //Point to the first byte to be processed
-            p = (uint8_t *) buffer->chunk[i].address + offset;
-            //Compute the number of bytes to process at a time
-            n = buffer->chunk[i].length - offset;
-
-            //Update HMAC calculation
-            hmacUpdate(hmacContext, p, n);
-
-            //Process the next block from the start
-            offset = 0;
-         }
-         else
-         {
-            //Skip the current chunk
-            offset -= buffer->chunk[i].length;
-         }
-      }
-
-      //Extended sequence numbers?
-      if(sa->esn)
-      {
-         //If the ESN option is elected for an SA, then the high-order 32 bits
-         //of the ESN must be included in the ICV computation
-         uint32_t seqh = ipsecGetSeqNum(sa, ntohl(ahHeader->seqNum)) >> 32;
-
-         //Convert the 32-bit value to network byte order
-         seqh = htonl(seqh);
-
-         //For purposes of ICV computation, these bits are appended (implicitly)
-         //immediately after the end of the payload
-         hmacUpdate(hmacContext, (uint8_t *) &seqh, 4);
-      }
-
-      //Finalize HMAC computation
-      hmacFinal(hmacContext, NULL);
-
-      //Debug message
-      TRACE_DEBUG_ARRAY("Calculated HMAC = ", hmacContext->digest, sa->icvLen);
-
-      //The calculated checksum is bitwise compared to the received ICV
-      for(mask = 0, i = 0; i < sa->icvLen; i++)
-      {
-         mask |= hmacContext->digest[i] ^ ahHeader->icv[i];
-      }
-   }
-   else
-#endif
 #if (AH_CMAC_SUPPORT == ENABLED)
    //CMAC integrity algorithm?
    if(sa->authCipherAlgo != NULL)
@@ -586,82 +496,159 @@ error_t ahVerifyIcv(IpsecSadEntry *sa, const Ipv4Header *ipv4Header,
       //and indicates the key required to validate the ICV
       error = cmacInit(cmacContext, sa->authCipherAlgo, sa->authKey,
          sa->authKeyLen);
-      //Any error to report?
-      if(error)
-         return error;
 
-      //Compute CMAC over the IP or extension header fields before the AH
-      //header that are either immutable in transit or that are predictable
-      //in value upon arrival at the endpoint for the AH SA
-      cmacUpdate(cmacContext, temp, n);
-
-      //The Payload Length field specifies the length of AH header in 32-bit
-      //words (4-byte units), minus 2
-      n = (ahHeader->payloadLen + 2) * sizeof(uint32_t);
-
-      //Copy the AH header
-      osMemcpy(temp, ahHeader, n);
-      //Point to the AH header
-      ahHeader2 = (AhHeader *) temp;
-
-      //The Integrity Check Value field is also set to zero in preparation for
-      //this computation (refer to RFC 4302, section 3.3.3.1)
-      osMemset(ahHeader2->icv, 0, sa->icvLen);
-
-      //Compute CMAC over the Next Header, Payload Length, Reserved, SPI,
-      //Sequence Number (low-order 32 bits) fields, and the ICV (which is set
-      //to zero for this computation)
-      cmacUpdate(cmacContext, temp, n);
-
-      //Everything after AH is assumed to be immutable in transit
-      for(i = 0; i < buffer->chunkCount; i++)
+      //Check status code
+      if(!error)
       {
-         //Is there any data to process from the current chunk?
-         if(offset < buffer->chunk[i].length)
+         //Compute CMAC over the IP or extension header fields before the AH
+         //header that are either immutable in transit or that are predictable
+         //in value upon arrival at the endpoint for the AH SA
+         cmacUpdate(cmacContext, temp, n);
+
+         //The Payload Length field specifies the length of AH header in 32-bit
+         //words (4-byte units), minus 2
+         n = (ahHeader->payloadLen + 2) * sizeof(uint32_t);
+
+         //Copy the AH header
+         osMemcpy(temp, ahHeader, n);
+         //Point to the AH header
+         ahHeader2 = (AhHeader *) temp;
+
+         //The Integrity Check Value field is also set to zero in preparation
+         //for this computation (refer to RFC 4302, section 3.3.3.1)
+         osMemset(ahHeader2->icv, 0, sa->icvLen);
+
+         //Compute CMAC over the Next Header, Payload Length, Reserved, SPI,
+         //Sequence Number (low-order 32 bits) fields, and the ICV (which is
+         //set to zero for this computation)
+         cmacUpdate(cmacContext, temp, n);
+
+         //Everything after AH is assumed to be immutable in transit
+         for(i = 0; i < buffer->chunkCount; i++)
          {
-            //Point to the first byte to be processed
-            p = (uint8_t *) buffer->chunk[i].address + offset;
-            //Compute the number of bytes to process at a time
-            n = buffer->chunk[i].length - offset;
+            //Is there any data to process from the current chunk?
+            if(offset < buffer->chunk[i].length)
+            {
+               //Point to the first byte to be processed
+               p = (uint8_t *) buffer->chunk[i].address + offset;
+               //Compute the number of bytes to process at a time
+               n = buffer->chunk[i].length - offset;
 
-            //Update CMAC calculation
-            cmacUpdate(cmacContext, p, n);
+               //Update CMAC calculation
+               cmacUpdate(cmacContext, p, n);
 
-            //Process the next block from the start
-            offset = 0;
+               //Process the next block from the start
+               offset = 0;
+            }
+            else
+            {
+               //Skip the current chunk
+               offset -= buffer->chunk[i].length;
+            }
          }
-         else
+
+         //Extended sequence numbers?
+         if(sa->esn)
          {
-            //Skip the current chunk
-            offset -= buffer->chunk[i].length;
+            //If the ESN option is elected for an SA, then the high-order 32
+            //bits of the ESN must be included in the ICV computation
+            uint32_t seqh = ipsecGetSeqNum(sa, ntohl(ahHeader->seqNum)) >> 32;
+
+            //Convert the 32-bit value to network byte order
+            seqh = htonl(seqh);
+
+            //For purposes of ICV computation, these bits are appended
+            //(implicitly) immediately after the end of the payload
+            cmacUpdate(cmacContext, (uint8_t *) &seqh, 4);
          }
+
+         //Finalize CMAC computation
+         cmacFinal(cmacContext, checksum, sa->icvLen);
       }
+   }
+   else
+#endif
+#if (AH_HMAC_SUPPORT == ENABLED)
+   //HMAC integrity algorithm?
+   if(sa->authHashAlgo != NULL)
+   {
+      HmacContext *hmacContext;
 
-      //Extended sequence numbers?
-      if(sa->esn)
+      //Point to the HMAC context
+      hmacContext = &context->hmacContext;
+
+      //The SAD entry specifies the algorithm employed for ICV computation,
+      //and indicates the key required to validate the ICV
+      error = hmacInit(hmacContext, sa->authHashAlgo, sa->authKey,
+         sa->authKeyLen);
+
+      //Check status code
+      if(!error)
       {
-         //If the ESN option is elected for an SA, then the high-order 32 bits
-         //of the ESN must be included in the ICV computation
-         uint32_t seqh = ipsecGetSeqNum(sa, ntohl(ahHeader->seqNum)) >> 32;
+         //Compute HMAC over the IP or extension header fields before the AH
+         //header that are either immutable in transit or that are predictable
+         //in value upon arrival at the endpoint for the AH SA
+         hmacUpdate(hmacContext, temp, n);
 
-         //Convert the 32-bit value to network byte order
-         seqh = htonl(seqh);
+         //The Payload Length field specifies the length of AH header in 32-bit
+         //words (4-byte units), minus 2
+         n = (ahHeader->payloadLen + 2) * 4;
 
-         //For purposes of ICV computation, these bits are appended (implicitly)
-         //immediately after the end of the payload
-         cmacUpdate(cmacContext, (uint8_t *) &seqh, 4);
-      }
+         //Copy the AH header
+         osMemcpy(temp, ahHeader, n);
+         //Point to the AH header
+         ahHeader2 = (AhHeader *) temp;
 
-      //Finalize CMAC computation
-      cmacFinal(cmacContext, NULL, sa->icvLen);
+         //The Integrity Check Value field is also set to zero in preparation
+         //for this computation (refer to RFC 4302, section 3.3.3.1)
+         osMemset(ahHeader2->icv, 0, sa->icvLen);
 
-      //Debug message
-      TRACE_DEBUG_ARRAY("Calculated CMAC = ", cmacContext->mac, sa->icvLen);
+         //Compute HMAC over the Next Header, Payload Length, Reserved, SPI,
+         //Sequence Number (low-order 32 bits) fields, and the ICV (which is
+         //set to zero for this computation)
+         hmacUpdate(hmacContext, temp, n);
 
-      //The calculated checksum is bitwise compared to the received ICV
-      for(mask = 0, i = 0; i < sa->icvLen; i++)
-      {
-         mask |= cmacContext->mac[i] ^ ahHeader->icv[i];
+         //Everything after AH is assumed to be immutable in transit
+         for(i = 0; i < buffer->chunkCount; i++)
+         {
+            //Is there any data to process from the current chunk?
+            if(offset < buffer->chunk[i].length)
+            {
+               //Point to the first byte to be processed
+               p = (uint8_t *) buffer->chunk[i].address + offset;
+               //Compute the number of bytes to process at a time
+               n = buffer->chunk[i].length - offset;
+
+               //Update HMAC calculation
+               hmacUpdate(hmacContext, p, n);
+
+               //Process the next block from the start
+               offset = 0;
+            }
+            else
+            {
+               //Skip the current chunk
+               offset -= buffer->chunk[i].length;
+            }
+         }
+
+         //Extended sequence numbers?
+         if(sa->esn)
+         {
+            //If the ESN option is elected for an SA, then the high-order 32
+            //bits of the ESN must be included in the ICV computation
+            uint32_t seqh = ipsecGetSeqNum(sa, ntohl(ahHeader->seqNum)) >> 32;
+
+            //Convert the 32-bit value to network byte order
+            seqh = htonl(seqh);
+
+            //For purposes of ICV computation, these bits are appended
+            //(implicitly) immediately after the end of the payload
+            hmacUpdate(hmacContext, (uint8_t *) &seqh, 4);
+         }
+
+         //Finalize HMAC computation
+         hmacFinal(hmacContext, checksum);
       }
    }
    else
@@ -669,20 +656,29 @@ error_t ahVerifyIcv(IpsecSadEntry *sa, const Ipv4Header *ipv4Header,
    //Unknown integrity algorithm?
    {
       //Report an error
-      return ERROR_FAILURE;
+      error = ERROR_INVALID_MAC;
    }
 
-   //If the ICV validation fails, the receiver must discard the received IP
-   //datagram as invalid. This is is an auditable event (refer to RFC 4302,
-   //section 3.4.3)
-   if(mask == 0)
+   //Check status code
+   if(!error)
    {
-      return NO_ERROR;
+      //Debug message
+      TRACE_DEBUG_ARRAY("Calculated ICV = ", checksum, sa->icvLen);
+
+      //The calculated checksum is bitwise compared to the received ICV
+      for(mask = 0, i = 0; i < sa->icvLen; i++)
+      {
+         mask |= checksum[i] ^ ahHeader->icv[i];
+      }
+
+      //If the ICV validation fails, the receiver must discard the received IP
+      //datagram as invalid. This is is an auditable event (refer to RFC 4302,
+      //section 3.4.3)
+      error = (mask == 0) ? NO_ERROR : ERROR_INVALID_MAC;
    }
-   else
-   {
-      return ERROR_INVALID_MAC;
-   }
+
+   //Return status code
+   return error;
 }
 
 

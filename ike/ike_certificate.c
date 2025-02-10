@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 //Switch to the appropriate trace level
@@ -69,7 +69,7 @@ error_t ikeGetCertificateType(const X509CertInfo *certInfo,
 
 #if (IKE_RSA_SIGN_SUPPORT == ENABLED || IKE_RSA_PSS_SIGN_SUPPORT == ENABLED)
    //RSA public key?
-   if(!oidComp(oid, oidLen, RSA_ENCRYPTION_OID, sizeof(RSA_ENCRYPTION_OID)))
+   if(OID_COMP(oid, oidLen, RSA_ENCRYPTION_OID) == 0)
    {
       //Save certificate type
       *certType = IKE_CERT_TYPE_RSA;
@@ -78,7 +78,7 @@ error_t ikeGetCertificateType(const X509CertInfo *certInfo,
 #endif
 #if (IKE_RSA_PSS_SIGN_SUPPORT == ENABLED)
    //RSA-PSS public key?
-   if(!oidComp(oid, oidLen, RSASSA_PSS_OID, sizeof(RSASSA_PSS_OID)))
+   if(OID_COMP(oid, oidLen, RSASSA_PSS_OID) == 0)
    {
       //Save certificate type
       *certType = IKE_CERT_TYPE_RSA_PSS;
@@ -87,7 +87,7 @@ error_t ikeGetCertificateType(const X509CertInfo *certInfo,
 #endif
 #if (IKE_DSA_SIGN_SUPPORT == ENABLED)
    //DSA public key?
-   if(!oidComp(oid, oidLen, DSA_OID, sizeof(DSA_OID)))
+   if(OID_COMP(oid, oidLen, DSA_OID) == 0)
    {
       //Save certificate type
       *certType = IKE_CERT_TYPE_DSA;
@@ -96,17 +96,21 @@ error_t ikeGetCertificateType(const X509CertInfo *certInfo,
 #endif
 #if (IKE_ECDSA_SIGN_SUPPORT == ENABLED)
    //EC public key?
-   if(!oidComp(oid, oidLen, EC_PUBLIC_KEY_OID, sizeof(EC_PUBLIC_KEY_OID)))
+   if(OID_COMP(oid, oidLen, EC_PUBLIC_KEY_OID) == 0)
    {
-      const X509EcParameters *params;
+      const X509SubjectPublicKeyInfo *subjectPublicKeyInfo;
 
-      //Point to the EC parameters
-      params = &certInfo->tbsCert.subjectPublicKeyInfo.ecParams;
+      //Point to the subject's public key information
+      subjectPublicKeyInfo = &certInfo->tbsCert.subjectPublicKeyInfo;
+
+      //The namedCurve field identifies a particular set of elliptic curve
+      //domain parameters
+      oid = subjectPublicKeyInfo->ecParams.namedCurve.value;
+      oidLen = subjectPublicKeyInfo->ecParams.namedCurve.length;
 
 #if (IKE_ECP_256_SUPPORT == ENABLED)
       //NIST P-256 elliptic curve?
-      if(!oidComp(params->namedCurve.value, params->namedCurve.length,
-         SECP256R1_OID, sizeof(SECP256R1_OID)))
+      if(OID_COMP(oid, oidLen, SECP256R1_OID) == 0)
       {
          *certType = IKE_CERT_TYPE_ECDSA_P256;
       }
@@ -114,8 +118,7 @@ error_t ikeGetCertificateType(const X509CertInfo *certInfo,
 #endif
 #if (IKE_ECP_384_SUPPORT == ENABLED)
       //NIST P-384 elliptic curve?
-      if(!oidComp(params->namedCurve.value, params->namedCurve.length,
-         SECP384R1_OID, sizeof(SECP384R1_OID)))
+      if(OID_COMP(oid, oidLen, SECP384R1_OID) == 0)
       {
          *certType = IKE_CERT_TYPE_ECDSA_P384;
       }
@@ -123,8 +126,7 @@ error_t ikeGetCertificateType(const X509CertInfo *certInfo,
 #endif
 #if (IKE_ECP_521_SUPPORT == ENABLED)
       //NIST P-521 elliptic curve?
-      if(!oidComp(params->namedCurve.value, params->namedCurve.length,
-         SECP521R1_OID, sizeof(SECP521R1_OID)))
+      if(OID_COMP(oid, oidLen, SECP521R1_OID) == 0)
       {
          *certType = IKE_CERT_TYPE_ECDSA_P521;
       }
@@ -132,8 +134,7 @@ error_t ikeGetCertificateType(const X509CertInfo *certInfo,
 #endif
 #if (IKE_BRAINPOOLP256R1_SUPPORT == ENABLED)
       //brainpoolP256r1 elliptic curve?
-      if(!oidComp(params->namedCurve.value, params->namedCurve.length,
-         BRAINPOOLP256R1_OID, sizeof(BRAINPOOLP256R1_OID)))
+      if(OID_COMP(oid, oidLen, BRAINPOOLP256R1_OID) == 0)
       {
          *certType = IKE_CERT_TYPE_ECDSA_BRAINPOOLP256R1;
       }
@@ -141,8 +142,7 @@ error_t ikeGetCertificateType(const X509CertInfo *certInfo,
 #endif
 #if (IKE_BRAINPOOLP384R1_SUPPORT == ENABLED)
       //brainpoolP384r1 elliptic curve?
-      if(!oidComp(params->namedCurve.value, params->namedCurve.length,
-         BRAINPOOLP384R1_OID, sizeof(BRAINPOOLP384R1_OID)))
+      if(OID_COMP(oid, oidLen, BRAINPOOLP384R1_OID) == 0)
       {
          *certType = IKE_CERT_TYPE_ECDSA_BRAINPOOLP384R1;
       }
@@ -150,8 +150,7 @@ error_t ikeGetCertificateType(const X509CertInfo *certInfo,
 #endif
 #if (IKE_BRAINPOOLP512R1_SUPPORT == ENABLED)
       //brainpoolP512r1 elliptic curve?
-      if(!oidComp(params->namedCurve.value, params->namedCurve.length,
-         BRAINPOOLP512R1_OID, sizeof(BRAINPOOLP512R1_OID)))
+      if(OID_COMP(oid, oidLen, BRAINPOOLP512R1_OID) == 0)
       {
          *certType = IKE_CERT_TYPE_ECDSA_BRAINPOOLP512R1;
       }
@@ -166,7 +165,7 @@ error_t ikeGetCertificateType(const X509CertInfo *certInfo,
 #endif
 #if (IKE_ED25519_SIGN_SUPPORT == ENABLED)
    //Ed25519 public key?
-   if(!oidComp(oid, oidLen, ED25519_OID, sizeof(ED25519_OID)))
+   if(OID_COMP(oid, oidLen, ED25519_OID) == 0)
    {
       //Save certificate type
       *certType = IKE_CERT_TYPE_ED25519;
@@ -175,7 +174,7 @@ error_t ikeGetCertificateType(const X509CertInfo *certInfo,
 #endif
 #if (IKE_ED448_SIGN_SUPPORT == ENABLED)
    //Ed448 public key?
-   if(!oidComp(oid, oidLen, ED448_OID, sizeof(ED448_OID)))
+   if(OID_COMP(oid, oidLen, ED448_OID) == 0)
    {
       //Save certificate type
       *certType = IKE_CERT_TYPE_ED448;

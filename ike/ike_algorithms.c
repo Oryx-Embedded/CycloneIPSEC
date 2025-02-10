@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 //Switch to the appropriate trace level
@@ -944,6 +944,17 @@ error_t ikeSelectAuthAlgo(IkeSaEntry *sa, uint16_t authAlgoId)
    //Initialize status code
    error = NO_ERROR;
 
+#if (IKE_CMAC_AUTH_SUPPORT == ENABLED && IKE_AES_128_SUPPORT == ENABLED)
+   //AES-CMAC-96 authentication algorithm?
+   if(authAlgoId == IKE_TRANSFORM_ID_AUTH_AES_CMAC_96)
+   {
+      sa->authHashAlgo = NULL;
+      sa->authCipherAlgo = AES_CIPHER_ALGO;
+      sa->authKeyLen = 16;
+      sa->icvLen = 12;
+   }
+   else
+#endif
 #if (IKE_HMAC_AUTH_SUPPORT == ENABLED && IKE_MD5_SUPPORT == ENABLED)
    //HMAC-MD5-96 authentication algorithm?
    if(authAlgoId == IKE_TRANSFORM_ID_AUTH_HMAC_MD5_96)
@@ -999,17 +1010,6 @@ error_t ikeSelectAuthAlgo(IkeSaEntry *sa, uint16_t authAlgoId)
    }
    else
 #endif
-#if (IKE_CMAC_AUTH_SUPPORT == ENABLED && IKE_AES_128_SUPPORT == ENABLED)
-   //AES-CMAC-96 authentication algorithm?
-   if(authAlgoId == IKE_TRANSFORM_ID_AUTH_AES_CMAC_96)
-   {
-      sa->authHashAlgo = NULL;
-      sa->authCipherAlgo = AES_CIPHER_ALGO;
-      sa->authKeyLen = 16;
-      sa->icvLen = 12;
-   }
-   else
-#endif
 #if (IKE_XCBC_MAC_AUTH_SUPPORT == ENABLED && IKE_AES_128_SUPPORT == ENABLED)
    //AES-XCBC-MAC-96 authentication algorithm?
    if(authAlgoId == IKE_TRANSFORM_ID_AUTH_AES_XCBC_96)
@@ -1046,6 +1046,16 @@ error_t ikeSelectPrfAlgo(IkeSaEntry *sa, uint16_t prfAlgoId)
    //Initialize status code
    error = NO_ERROR;
 
+#if (IKE_CMAC_PRF_SUPPORT == ENABLED && IKE_AES_128_SUPPORT == ENABLED)
+   //AES-CMAC PRF algorithm?
+   if(prfAlgoId == IKE_TRANSFORM_ID_PRF_AES128_CMAC)
+   {
+      sa->prfHashAlgo = NULL;
+      sa->prfCipherAlgo = AES_CIPHER_ALGO;
+      sa->prfKeyLen = 16;
+   }
+   else
+#endif
 #if (IKE_HMAC_PRF_SUPPORT == ENABLED && IKE_MD5_SUPPORT == ENABLED)
    //HMAC-MD5 PRF algorithm?
    if(prfAlgoId == IKE_TRANSFORM_ID_PRF_HMAC_MD5)
@@ -1103,16 +1113,6 @@ error_t ikeSelectPrfAlgo(IkeSaEntry *sa, uint16_t prfAlgoId)
       sa->prfHashAlgo = TIGER_HASH_ALGO;
       sa->prfCipherAlgo = NULL;
       sa->prfKeyLen = TIGER_DIGEST_SIZE;
-   }
-   else
-#endif
-#if (IKE_CMAC_PRF_SUPPORT == ENABLED && IKE_AES_128_SUPPORT == ENABLED)
-   //AES-CMAC PRF algorithm?
-   if(prfAlgoId == IKE_TRANSFORM_ID_PRF_AES128_CMAC)
-   {
-      sa->prfHashAlgo = NULL;
-      sa->prfCipherAlgo = AES_CIPHER_ALGO;
-      sa->prfKeyLen = 16;
    }
    else
 #endif
@@ -2176,21 +2176,43 @@ bool_t ikeIsEcdhKeyExchangeAlgo(uint16_t groupNum)
 
 
 /**
- * @brief Get the elliptic curve that matches the specified group number
+ * @brief Test if the group number identifies an ML-KEM key exchange algorithm
  * @param[in] groupNum Group number
- * @return Elliptic curve domain parameters
+ * @return TRUE if ML-KEM key exchange algorithm, else FALSE
  **/
 
-const EcCurveInfo *ikeGetEcdhCurveInfo(uint16_t groupNum)
+bool_t ikeIsMlkemKeyExchangeAlgo(uint16_t groupNum)
 {
-   const EcCurveInfo *curveInfo;
+   //ML-KEM key exchange?
+   if(groupNum == IKE_TRANSFORM_ID_DH_GROUP_ML_KEM_512 ||
+      groupNum == IKE_TRANSFORM_ID_DH_GROUP_ML_KEM_768 ||
+      groupNum == IKE_TRANSFORM_ID_DH_GROUP_ML_KEM_1024)
+   {
+      return TRUE;
+   }
+   else
+   {
+      return FALSE;
+   }
+}
+
+
+/**
+ * @brief Get the elliptic curve that matches the specified group number
+ * @param[in] groupNum Group number
+ * @return Elliptic curve parameters
+ **/
+
+const EcCurve *ikeGetEcdhCurve(uint16_t groupNum)
+{
+   const EcCurve *curve;
 
 #if (IKE_ECDH_KE_SUPPORT == ENABLED)
 #if (IKE_ECP_192_SUPPORT == ENABLED)
    //NIST P-192 elliptic curve?
    if(groupNum == IKE_TRANSFORM_ID_DH_GROUP_ECP_192)
    {
-      curveInfo = SECP192R1_CURVE;
+      curve = SECP192R1_CURVE;
    }
    else
 #endif
@@ -2198,7 +2220,7 @@ const EcCurveInfo *ikeGetEcdhCurveInfo(uint16_t groupNum)
    //NIST P-224 elliptic curve?
    if(groupNum == IKE_TRANSFORM_ID_DH_GROUP_ECP_224)
    {
-      curveInfo = SECP224R1_CURVE;
+      curve = SECP224R1_CURVE;
    }
    else
 #endif
@@ -2206,7 +2228,7 @@ const EcCurveInfo *ikeGetEcdhCurveInfo(uint16_t groupNum)
    //NIST P-256 elliptic curve?
    if(groupNum == IKE_TRANSFORM_ID_DH_GROUP_ECP_256)
    {
-      curveInfo = SECP256R1_CURVE;
+      curve = SECP256R1_CURVE;
    }
    else
 #endif
@@ -2214,7 +2236,7 @@ const EcCurveInfo *ikeGetEcdhCurveInfo(uint16_t groupNum)
    //NIST P-384 elliptic curve?
    if(groupNum == IKE_TRANSFORM_ID_DH_GROUP_ECP_384)
    {
-      curveInfo = SECP384R1_CURVE;
+      curve = SECP384R1_CURVE;
    }
    else
 #endif
@@ -2222,7 +2244,7 @@ const EcCurveInfo *ikeGetEcdhCurveInfo(uint16_t groupNum)
    //NIST P-521 elliptic curve?
    if(groupNum == IKE_TRANSFORM_ID_DH_GROUP_ECP_521)
    {
-      curveInfo = SECP521R1_CURVE;
+      curve = SECP521R1_CURVE;
    }
    else
 #endif
@@ -2230,7 +2252,7 @@ const EcCurveInfo *ikeGetEcdhCurveInfo(uint16_t groupNum)
    //brainpoolP224r1 elliptic curve?
    if(groupNum == IKE_TRANSFORM_ID_DH_GROUP_BRAINPOOLP224R1)
    {
-      curveInfo = BRAINPOOLP224R1_CURVE;
+      curve = BRAINPOOLP224R1_CURVE;
    }
    else
 #endif
@@ -2238,7 +2260,7 @@ const EcCurveInfo *ikeGetEcdhCurveInfo(uint16_t groupNum)
    //brainpoolP256r1 elliptic curve?
    if(groupNum == IKE_TRANSFORM_ID_DH_GROUP_BRAINPOOLP256R1)
    {
-      curveInfo = BRAINPOOLP256R1_CURVE;
+      curve = BRAINPOOLP256R1_CURVE;
    }
    else
 #endif
@@ -2246,7 +2268,7 @@ const EcCurveInfo *ikeGetEcdhCurveInfo(uint16_t groupNum)
    //brainpoolP384r1 elliptic curve?
    if(groupNum == IKE_TRANSFORM_ID_DH_GROUP_BRAINPOOLP384R1)
    {
-      curveInfo = BRAINPOOLP384R1_CURVE;
+      curve = BRAINPOOLP384R1_CURVE;
    }
    else
 #endif
@@ -2254,7 +2276,7 @@ const EcCurveInfo *ikeGetEcdhCurveInfo(uint16_t groupNum)
    //brainpoolP512r1 elliptic curve?
    if(groupNum == IKE_TRANSFORM_ID_DH_GROUP_BRAINPOOLP512R1)
    {
-      curveInfo = BRAINPOOLP512R1_CURVE;
+      curve = BRAINPOOLP512R1_CURVE;
    }
    else
 #endif
@@ -2262,7 +2284,7 @@ const EcCurveInfo *ikeGetEcdhCurveInfo(uint16_t groupNum)
    //Curve25519 elliptic curve?
    if(groupNum == IKE_TRANSFORM_ID_DH_GROUP_CURVE25519)
    {
-      curveInfo = X25519_CURVE;
+      curve = X25519_CURVE;
    }
    else
 #endif
@@ -2270,50 +2292,18 @@ const EcCurveInfo *ikeGetEcdhCurveInfo(uint16_t groupNum)
    //Curve448 elliptic curve?
    if(groupNum == IKE_TRANSFORM_ID_DH_GROUP_CURVE448)
    {
-      curveInfo = X448_CURVE;
+      curve = X448_CURVE;
    }
    else
 #endif
 #endif
    //Unknown elliptic curve?
    {
-      curveInfo = NULL;
+      curve = NULL;
    }
 
-   //Return the elliptic curve domain parameters, if any
-   return curveInfo;
-}
-
-
-/**
- * @brief Load the EC parameters that match the specified group number
- * @param[in,out] params Elliptic curve domain parameters
- * @param[in] groupNum Group number
- * @return Error code
- **/
-
-error_t ikeLoadEcdhParams(EcDomainParameters *params, uint16_t groupNum)
-{
-   error_t error;
-   const EcCurveInfo *curveInfo;
-
-   //Get the elliptic curve that matches the specified group number
-   curveInfo = ikeGetEcdhCurveInfo(groupNum);
-
-   //Make sure the group number is acceptable
-   if(curveInfo != NULL)
-   {
-      //Load EC domain parameters
-      error = ecLoadDomainParameters(params, curveInfo);
-   }
-   else
-   {
-      //Report an error
-      error = ERROR_UNSUPPORTED_TYPE;
-   }
-
-   //Return status code
-   return error;
+   //Return the elliptic curve parameters, if any
+   return curve;
 }
 
 

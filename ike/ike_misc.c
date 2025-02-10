@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 //Switch to the appropriate trace level
@@ -936,7 +936,7 @@ error_t ikeCheckNonceLength(IkeSaEntry *sa, size_t nonceLen)
    size_t prfKeyLen;
 
 #if (IKE_CMAC_PRF_SUPPORT == ENABLED && IKE_AES_128_SUPPORT == ENABLED)
-   //AES-CMAC-96 PRF algorithm?
+   //AES-CMAC PRF algorithm?
    if(sa->prfAlgoId == IKE_TRANSFORM_ID_PRF_AES128_CMAC)
    {
       prfKeyLen = 16;
@@ -980,6 +980,22 @@ error_t ikeCheckNonceLength(IkeSaEntry *sa, size_t nonceLen)
    if(sa->prfAlgoId == IKE_TRANSFORM_ID_PRF_HMAC_SHA2_512)
    {
       prfKeyLen = SHA512_DIGEST_SIZE;
+   }
+   else
+#endif
+#if (IKE_HMAC_PRF_SUPPORT == ENABLED && IKE_TIGER_SUPPORT == ENABLED)
+   //HMAC-Tiger PRF algorithm?
+   if(sa->prfAlgoId == IKE_TRANSFORM_ID_PRF_HMAC_TIGER)
+   {
+      prfKeyLen = TIGER_DIGEST_SIZE;
+   }
+   else
+#endif
+#if (IKE_XCBC_MAC_PRF_SUPPORT == ENABLED && IKE_AES_128_SUPPORT == ENABLED)
+   //AES-XCBC-MAC PRF algorithm?
+   if(sa->prfAlgoId == IKE_TRANSFORM_ID_PRF_AES128_XCBC)
+   {
+      prfKeyLen = 16;
    }
    else
 #endif

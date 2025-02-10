@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 //Switch to the appropriate trace level
@@ -359,6 +359,43 @@ error_t espComputeChecksum(IpsecContext *context, IpsecSadEntry *sa,
 {
    error_t error;
 
+#if (ESP_CMAC_SUPPORT == ENABLED)
+   //CMAC integrity algorithm?
+   if(sa->authCipherAlgo != NULL)
+   {
+      CmacContext *cmacContext;
+
+      //Point to the CMAC context
+      cmacContext = &context->cmacContext;
+
+      //The SAD entry specifies the algorithm employed for ICV computation
+      error = cmacInit(cmacContext, sa->authCipherAlgo, sa->authKey,
+         sa->authKeyLen);
+
+      //Check status code
+      if(!error)
+      {
+         //The checksum must be computed over the encrypted message. Its length
+         //is determined by the integrity algorithm negotiated
+         cmacUpdate(cmacContext, espHeader, sizeof(EspHeader));
+         cmacUpdate(cmacContext, payload, length);
+
+         //Extended sequence number?
+         if(sa->esn)
+         {
+            //The high-order 32 bits are maintained as part of the sequence
+            //number counter by both transmitter and receiver and are included
+            //in the computation of the ICV (refer to RFC 4303, section 2.2.1)
+            uint32_t h = htonl(sa->seqNum >> 32);
+            cmacUpdate(cmacContext, (uint8_t *) &h, 4);
+         }
+
+         //Finalize CMAC computation
+         cmacFinal(cmacContext, icv, sa->icvLen);
+      }
+   }
+   else
+#endif
 #if (ESP_HMAC_SUPPORT == ENABLED)
    //HMAC integrity algorithm?
    if(sa->authHashAlgo != NULL)
@@ -395,43 +432,6 @@ error_t espComputeChecksum(IpsecContext *context, IpsecSadEntry *sa,
 
          //Copy the resulting checksum value
          osMemcpy(icv, hmacContext->digest, sa->icvLen);
-      }
-   }
-   else
-#endif
-#if (ESP_CMAC_SUPPORT == ENABLED)
-   //CMAC integrity algorithm?
-   if(sa->authCipherAlgo != NULL)
-   {
-      CmacContext *cmacContext;
-
-      //Point to the CMAC context
-      cmacContext = &context->cmacContext;
-
-      //The SAD entry specifies the algorithm employed for ICV computation
-      error = cmacInit(cmacContext, sa->authCipherAlgo, sa->authKey,
-         sa->authKeyLen);
-
-      //Check status code
-      if(!error)
-      {
-         //The checksum must be computed over the encrypted message. Its length
-         //is determined by the integrity algorithm negotiated
-         cmacUpdate(cmacContext, espHeader, sizeof(EspHeader));
-         cmacUpdate(cmacContext, payload, length);
-
-         //Extended sequence number?
-         if(sa->esn)
-         {
-            //The high-order 32 bits are maintained as part of the sequence
-            //number counter by both transmitter and receiver and are included
-            //in the computation of the ICV (refer to RFC 4303, section 2.2.1)
-            uint32_t h = htonl(sa->seqNum >> 32);
-            cmacUpdate(cmacContext, (uint8_t *) &h, 4);
-         }
-
-         //Finalize CMAC computation
-         cmacFinal(cmacContext, icv, sa->icvLen);
       }
    }
    else

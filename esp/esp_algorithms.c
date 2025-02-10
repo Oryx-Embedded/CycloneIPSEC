@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 //Switch to the appropriate trace level
@@ -827,6 +827,17 @@ error_t espSelectAuthAlgo(IkeChildSaEntry *childSa, uint16_t authAlgoId)
    //Initialize status code
    error = NO_ERROR;
 
+#if (ESP_CMAC_SUPPORT == ENABLED && ESP_AES_128_SUPPORT == ENABLED)
+   //AES-CMAC-96 authentication algorithm?
+   if(authAlgoId == IKE_TRANSFORM_ID_AUTH_AES_CMAC_96)
+   {
+      childSa->authHashAlgo = NULL;
+      childSa->authCipherAlgo = AES_CIPHER_ALGO;
+      childSa->authKeyLen = 16;
+      childSa->icvLen = 12;
+   }
+   else
+#endif
 #if (ESP_HMAC_SUPPORT == ENABLED && ESP_MD5_SUPPORT == ENABLED)
    //HMAC-MD5-96 authentication algorithm?
    if(authAlgoId == IKE_TRANSFORM_ID_AUTH_HMAC_MD5_96)
@@ -879,17 +890,6 @@ error_t espSelectAuthAlgo(IkeChildSaEntry *childSa, uint16_t authAlgoId)
       childSa->authCipherAlgo = NULL;
       childSa->authKeyLen = SHA512_DIGEST_SIZE;
       childSa->icvLen = 32;
-   }
-   else
-#endif
-#if (ESP_CMAC_SUPPORT == ENABLED && ESP_AES_128_SUPPORT == ENABLED)
-   //AES-CMAC-96 authentication algorithm?
-   if(authAlgoId == IKE_TRANSFORM_ID_AUTH_AES_CMAC_96)
-   {
-      childSa->authHashAlgo = NULL;
-      childSa->authCipherAlgo = AES_CIPHER_ALGO;
-      childSa->authKeyLen = 16;
-      childSa->icvLen = 12;
    }
    else
 #endif
@@ -1414,7 +1414,7 @@ error_t espCheckSaProposal(IkeChildSaEntry *childSa, const IkeSaPayload *payload
          return ERROR_INVALID_PROPOSAL;
 
       //Get the selected integrity transform
-      childSa->authAlgoId = ikeSelectAuthTransform(childSa->context, proposal,
+      childSa->authAlgoId = espSelectAuthTransform(childSa->context, proposal,
          n);
    }
 

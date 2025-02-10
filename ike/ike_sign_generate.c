@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 //Switch to the appropriate trace level
@@ -347,7 +347,7 @@ error_t ikeGenerateRsaSignature(IkeSaEntry *sa, const uint8_t *id,
    error_t error;
    IkeContext *context;
    RsaPrivateKey rsaPrivateKey;
-   uint8_t digest[MAX_HASH_DIGEST_SIZE];
+   uint8_t digest[IKE_MAX_DIGEST_SIZE];
 
    //Point to the IKE context
    context = sa->context;
@@ -363,8 +363,8 @@ error_t ikeGenerateRsaSignature(IkeSaEntry *sa, const uint8_t *id,
    if(!error)
    {
       //Import RSA private key
-      error = pemImportRsaPrivateKey(context->privateKey,
-         context->privateKeyLen, context->password, &rsaPrivateKey);
+      error = pemImportRsaPrivateKey(&rsaPrivateKey, context->privateKey,
+         context->privateKeyLen, context->password);
    }
 
    //Check status code
@@ -407,7 +407,7 @@ error_t ikeGenerateRsaPssSignature(IkeSaEntry *sa, const uint8_t *id,
    error_t error;
    IkeContext *context;
    RsaPrivateKey rsaPrivateKey;
-   uint8_t digest[MAX_HASH_DIGEST_SIZE];
+   uint8_t digest[IKE_MAX_DIGEST_SIZE];
 
    //Point to the IKE context
    context = sa->context;
@@ -423,8 +423,8 @@ error_t ikeGenerateRsaPssSignature(IkeSaEntry *sa, const uint8_t *id,
    if(!error)
    {
       //Import RSA private key
-      error = pemImportRsaPrivateKey(context->privateKey,
-         context->privateKeyLen, context->password, &rsaPrivateKey);
+      error = pemImportRsaPrivateKey(&rsaPrivateKey, context->privateKey,
+         context->privateKeyLen, context->password);
    }
 
    //Check status code
@@ -468,7 +468,7 @@ error_t ikeGenerateDsaSignature(IkeSaEntry *sa, const uint8_t *id,
    IkeContext *context;
    DsaPrivateKey dsaPrivateKey;
    DsaSignature dsaSignature;
-   uint8_t digest[MAX_HASH_DIGEST_SIZE];
+   uint8_t digest[IKE_MAX_DIGEST_SIZE];
 
    //Point to the IKE context
    context = sa->context;
@@ -486,8 +486,8 @@ error_t ikeGenerateDsaSignature(IkeSaEntry *sa, const uint8_t *id,
    if(!error)
    {
       //Import DSA private key
-      error = pemImportDsaPrivateKey(context->privateKey,
-         context->privateKeyLen, context->password, &dsaPrivateKey);
+      error = pemImportDsaPrivateKey(&dsaPrivateKey, context->privateKey,
+         context->privateKeyLen, context->password);
    }
 
    //Check status code
@@ -524,7 +524,7 @@ error_t ikeGenerateDsaSignature(IkeSaEntry *sa, const uint8_t *id,
  * @param[in] sa Pointer to the IKE SA
  * @param[in] id Pointer to the identification data
  * @param[in] idLen Length of the identification data, in bytes
- * @param[in] curveInfo Elliptic curve parameters
+ * @param[in] group Elliptic curve group
  * @param[in] hashAlgo Hash algorithm
  * @param[out] signature Output stream where to write the signature
  * @param[out] signatureLen Total number of bytes that have been written
@@ -533,22 +533,19 @@ error_t ikeGenerateDsaSignature(IkeSaEntry *sa, const uint8_t *id,
  **/
 
 error_t ikeGenerateEcdsaSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const EcCurveInfo *curveInfo, const HashAlgo *hashAlgo,
+   size_t idLen, const EcCurve *group, const HashAlgo *hashAlgo,
    uint8_t *signature, size_t *signatureLen, IkeSignFormat format)
 {
 #if (IKE_ECDSA_SIGN_SUPPORT == ENABLED)
    error_t error;
    IkeContext *context;
-   EcDomainParameters ecParams;
    EcPrivateKey ecPrivateKey;
    EcdsaSignature ecdsaSignature;
-   uint8_t digest[MAX_HASH_DIGEST_SIZE];
+   uint8_t digest[IKE_MAX_DIGEST_SIZE];
 
    //Point to the IKE context
    context = sa->context;
 
-   //Initialize EC domain parameters
-   ecInitDomainParameters(&ecParams);
    //Initialize EC private key
    ecInitPrivateKey(&ecPrivateKey);
    //Initialize ECDSA signature
@@ -561,16 +558,9 @@ error_t ikeGenerateEcdsaSignature(IkeSaEntry *sa, const uint8_t *id,
    //Check status code
    if(!error)
    {
-      //Load EC domain parameters
-      error = ecLoadDomainParameters(&ecParams, curveInfo);
-   }
-
-   //Check status code
-   if(!error)
-   {
       //Import EC private key
-      error = pemImportEcPrivateKey(context->privateKey,
-         context->privateKeyLen, context->password, &ecPrivateKey);
+      error = pemImportEcPrivateKey(&ecPrivateKey, context->privateKey,
+         context->privateKeyLen, context->password);
    }
 
    //Check status code
@@ -578,20 +568,18 @@ error_t ikeGenerateEcdsaSignature(IkeSaEntry *sa, const uint8_t *id,
    {
       //Generate ECDSA signature
       error = ecdsaGenerateSignature(context->prngAlgo, context->prngContext,
-         &ecParams, &ecPrivateKey, digest, hashAlgo->digestSize,
-         &ecdsaSignature);
+         &ecPrivateKey, digest, hashAlgo->digestSize, &ecdsaSignature);
    }
 
    //Check status code
    if(!error)
    {
       //Encode (R, S) integer pair
-      error = ikeFormatEcdsaSignature(&ecParams, &ecdsaSignature, signature,
-         signatureLen, format);
+      error = ikeFormatEcdsaSignature(&ecdsaSignature, signature, signatureLen,
+         format);
    }
 
    //Free previously allocated memory
-   ecFreeDomainParameters(&ecParams);
    ecFreePrivateKey(&ecPrivateKey);
    ecdsaFreeSignature(&ecdsaSignature);
 
@@ -619,11 +607,11 @@ error_t ikeGenerateEd25519Signature(IkeSaEntry *sa, const uint8_t *id,
 {
 #if (IKE_ED25519_SIGN_SUPPORT == ENABLED)
    error_t error;
+   const uint8_t *q;
    IkeContext *context;
    EddsaPrivateKey ed25519PrivateKey;
-   DataChunk messageChunks[4];
-   uint8_t macId[MAX_HASH_DIGEST_SIZE];
-   uint8_t d[ED25519_PRIVATE_KEY_LEN];
+   DataChunk messageChunks[3];
+   uint8_t macId[IKE_MAX_DIGEST_SIZE];
 
    //Point to the IKE context
    context = sa->context;
@@ -639,24 +627,19 @@ error_t ikeGenerateEd25519Signature(IkeSaEntry *sa, const uint8_t *id,
    if(!error)
    {
       //Import Ed25519 private key
-      error = pemImportEddsaPrivateKey(context->privateKey,
-         context->privateKeyLen, context->password, &ed25519PrivateKey);
+      error = pemImportEddsaPrivateKey(&ed25519PrivateKey, context->privateKey,
+         context->privateKeyLen, context->password);
    }
 
    //Check status code
    if(!error)
    {
-      //Retrieve raw private key
-      error = mpiExport(&ed25519PrivateKey.d, d, ED25519_PRIVATE_KEY_LEN,
-         MPI_FORMAT_LITTLE_ENDIAN);
-   }
+      //The public key is optional
+      q = (ed25519PrivateKey.q.curve != NULL) ? ed25519PrivateKey.q.q : NULL;
 
-   //Check status code
-   if(!error)
-   {
       //Generate Ed25519 signature
-      error = ed25519GenerateSignatureEx(d, NULL, messageChunks, NULL, 0, 0,
-         signature);
+      error = ed25519GenerateSignatureEx(ed25519PrivateKey.d, q,
+         messageChunks, arraysize(messageChunks), NULL, 0, 0, signature);
    }
 
    //Check status code
@@ -693,11 +676,11 @@ error_t ikeGenerateEd448Signature(IkeSaEntry *sa, const uint8_t *id,
 {
 #if (IKE_ED448_SIGN_SUPPORT == ENABLED)
    error_t error;
+   const uint8_t *q;
    IkeContext *context;
    EddsaPrivateKey ed448PrivateKey;
-   DataChunk messageChunks[4];
-   uint8_t macId[MAX_HASH_DIGEST_SIZE];
-   uint8_t d[ED448_PRIVATE_KEY_LEN];
+   DataChunk messageChunks[3];
+   uint8_t macId[IKE_MAX_DIGEST_SIZE];
 
    //Point to the IKE context
    context = sa->context;
@@ -713,24 +696,19 @@ error_t ikeGenerateEd448Signature(IkeSaEntry *sa, const uint8_t *id,
    if(!error)
    {
       //Import Ed448 private key
-      error = pemImportEddsaPrivateKey(context->privateKey,
-         context->privateKeyLen, context->password, &ed448PrivateKey);
+      error = pemImportEddsaPrivateKey(&ed448PrivateKey, context->privateKey,
+         context->privateKeyLen, context->password);
    }
 
    //Check status code
    if(!error)
    {
-      //Retrieve raw private key
-      error = mpiExport(&ed448PrivateKey.d, d, ED448_PRIVATE_KEY_LEN,
-         MPI_FORMAT_LITTLE_ENDIAN);
-   }
+      //The public key is optional
+      q = (ed448PrivateKey.q.curve != NULL) ? ed448PrivateKey.q.q : NULL;
 
-   //Check status code
-   if(!error)
-   {
       //Generate Ed448 signature
-      error = ed448GenerateSignatureEx(d, NULL, messageChunks, NULL, 0, 0,
-         signature);
+      error = ed448GenerateSignatureEx(ed448PrivateKey.d, q, messageChunks,
+         arraysize(messageChunks), NULL, 0, 0, signature);
    }
 
    //Check status code

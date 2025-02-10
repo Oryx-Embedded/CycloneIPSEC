@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 //Switch to the appropriate trace level
@@ -353,51 +353,8 @@ error_t espVerifyChecksum(IpsecContext *context, IpsecSadEntry *sa,
    error_t error;
    size_t i;
    uint8_t mask;
-   uint8_t checksum[MAX_HASH_DIGEST_SIZE];
+   uint8_t checksum[ESP_MAX_DIGEST_SIZE];
 
-#if (ESP_HMAC_SUPPORT == ENABLED)
-   //HMAC integrity algorithm?
-   if(sa->authHashAlgo != NULL)
-   {
-      HmacContext *hmacContext;
-
-      //Point to the HMAC context
-      hmacContext = &context->hmacContext;
-
-      //The SAD entry specifies the algorithms and keys to be employed for
-      //decryption and ICV computation (refer to RFC 4303, section 3.4.2)
-      error = hmacInit(hmacContext, sa->authHashAlgo, sa->authKey,
-         sa->authKeyLen);
-
-      //Check status code
-      if(!error)
-      {
-         //The receiver computes the ICV over the ESP packet minus the ICV,
-         //using the specified integrity algorithm
-         hmacUpdate(hmacContext, espHeader, sizeof(EspHeader));
-         hmacUpdate(hmacContext, payload, length);
-
-         //Extended sequence number?
-         if(sa->esn)
-         {
-            //Determine the higher-order bits of the sequence number
-            uint32_t seqh = ipsecGetSeqNum(sa, ntohl(espHeader->seqNum)) >> 32;
-
-            //Convert the 32-bit value to network byte order
-            seqh = htonl(seqh);
-
-            //The high-order 32 bits are maintained as part of the sequence
-            //number counter by both transmitter and receiver and are included
-            //in the computation of the ICV (refer to RFC 4303, section 2.2.1)
-            hmacUpdate(hmacContext, (uint8_t *) &seqh, 4);
-         }
-
-         //Finalize HMAC computation
-         hmacFinal(hmacContext, checksum);
-      }
-   }
-   else
-#endif
 #if (ESP_CMAC_SUPPORT == ENABLED)
    //CMAC integrity algorithm?
    if(sa->authCipherAlgo != NULL)
@@ -437,6 +394,49 @@ error_t espVerifyChecksum(IpsecContext *context, IpsecSadEntry *sa,
 
          //Finalize CMAC computation
          cmacFinal(cmacContext, checksum, sa->icvLen);
+      }
+   }
+   else
+#endif
+#if (ESP_HMAC_SUPPORT == ENABLED)
+   //HMAC integrity algorithm?
+   if(sa->authHashAlgo != NULL)
+   {
+      HmacContext *hmacContext;
+
+      //Point to the HMAC context
+      hmacContext = &context->hmacContext;
+
+      //The SAD entry specifies the algorithms and keys to be employed for
+      //decryption and ICV computation (refer to RFC 4303, section 3.4.2)
+      error = hmacInit(hmacContext, sa->authHashAlgo, sa->authKey,
+         sa->authKeyLen);
+
+      //Check status code
+      if(!error)
+      {
+         //The receiver computes the ICV over the ESP packet minus the ICV,
+         //using the specified integrity algorithm
+         hmacUpdate(hmacContext, espHeader, sizeof(EspHeader));
+         hmacUpdate(hmacContext, payload, length);
+
+         //Extended sequence number?
+         if(sa->esn)
+         {
+            //Determine the higher-order bits of the sequence number
+            uint32_t seqh = ipsecGetSeqNum(sa, ntohl(espHeader->seqNum)) >> 32;
+
+            //Convert the 32-bit value to network byte order
+            seqh = htonl(seqh);
+
+            //The high-order 32 bits are maintained as part of the sequence
+            //number counter by both transmitter and receiver and are included
+            //in the computation of the ICV (refer to RFC 4303, section 2.2.1)
+            hmacUpdate(hmacContext, (uint8_t *) &seqh, 4);
+         }
+
+         //Finalize HMAC computation
+         hmacFinal(hmacContext, checksum);
       }
    }
    else

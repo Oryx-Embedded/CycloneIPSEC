@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 //Switch to the appropriate trace level
@@ -125,7 +125,7 @@ error_t ipsecInit(IpsecContext *context, const IpsecSettings *settings)
 /**
  * @brief Set entry at specified index in SPD database
  * @param[in] context Pointer to the IPsec context
- * @param[in] index ID type Zero-based index identifying a given entry
+ * @param[in] index Zero-based index identifying a given entry
  * @param[in] params Pointer to the structure describing the SPD entry
  * @return Error code
  **/
@@ -152,7 +152,7 @@ error_t ipsecSetSpdEntry(IpsecContext *context, uint_t index,
 /**
  * @brief Clear entry at specified index in SPD database
  * @param[in] context Pointer to the IPsec context
- * @param[in] index ID type Zero-based index identifying a given entry
+ * @param[in] index Zero-based index identifying a given entry
  * @return Error code
  **/
 
@@ -177,7 +177,7 @@ error_t ipsecClearSpdEntry(IpsecContext *context, uint_t index)
 /**
  * @brief Set entry at specified index in SAD database
  * @param[in] context Pointer to the IPsec context
- * @param[in] index ID type Zero-based index identifying a given entry
+ * @param[in] index Zero-based index identifying a given entry
  * @param[in] params Pointer to the structure describing the SAD entry
  * @return Error code
  **/
@@ -253,7 +253,7 @@ error_t ipsecSetSadEntry(IpsecContext *context, uint_t index,
 /**
  * @brief Clear entry at specified index in SAD database
  * @param[in] context Pointer to the IPsec context
- * @param[in] index ID type Zero-based index identifying a given entry
+ * @param[in] index Zero-based index identifying a given entry
  * @return Error code
  **/
 
@@ -313,7 +313,7 @@ error_t ipsecClearSadEntry(IpsecContext *context, uint_t index)
 /**
  * @brief Set entry at specified index in PAD database
  * @param[in] context Pointer to the IPsec context
- * @param[in] index ID type Zero-based index identifying a given entry
+ * @param[in] index Zero-based index identifying a given entry
  * @param[in] params Pointer to the structure describing the PAD entry
  * @return Error code
  **/
@@ -340,7 +340,7 @@ error_t ipsecSetPadEntry(IpsecContext *context, uint_t index,
 /**
  * @brief Clear entry at specified index in PAD database
  * @param[in] context Pointer to the IPsec context
- * @param[in] index ID type Zero-based index identifying a given entry
+ * @param[in] index Zero-based index identifying a given entry
  * @return Error code
  **/
 

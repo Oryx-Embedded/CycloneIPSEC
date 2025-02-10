@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 #ifndef _IKE_SIGN_GENERATE_H
@@ -61,7 +61,7 @@ error_t ikeGenerateDsaSignature(IkeSaEntry *sa, const uint8_t *id,
    size_t *signatureLen, IkeSignFormat format);
 
 error_t ikeGenerateEcdsaSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const EcCurveInfo *curveInfo, const HashAlgo *hashAlgo,
+   size_t idLen, const EcCurve *group, const HashAlgo *hashAlgo,
    uint8_t *signature, size_t *signatureLen, IkeSignFormat format);
 
 error_t ikeGenerateEd25519Signature(IkeSaEntry *sa, const uint8_t *id,

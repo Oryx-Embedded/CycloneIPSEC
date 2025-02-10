@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 //Switch to the appropriate trace level
@@ -118,15 +118,25 @@ error_t ikeGenerateDhKeyPair(IkeSaEntry *sa)
    //ECDH key exchange algorithm?
    if(ikeIsEcdhKeyExchangeAlgo(sa->dhGroupNum))
    {
-      //Load EC parameters
-      error = ikeLoadEcdhParams(&sa->ecdhContext.params, sa->dhGroupNum);
+      const EcCurve *curve;
 
-      //Check status code
-      if(!error)
+      //Get the elliptic curve that matches the specified group number
+      curve = ikeGetEcdhCurve(sa->dhGroupNum);
+
+      //Valid elliptic curve?
+      if(curve != NULL)
       {
+         //Save elliptic curve parameters
+         sa->ecdhContext.curve = curve;
+
          //Generate an ephemeral key pair
          error = ecdhGenerateKeyPair(&sa->ecdhContext, context->prngAlgo,
             context->prngContext);
+      }
+      else
+      {
+         //Report an error
+         error = ERROR_UNSUPPORTED_TYPE;
       }
    }
    else
@@ -239,53 +249,29 @@ error_t ikeFormatDhPublicKey(IkeSaEntry *sa, uint8_t *p, size_t *written)
    //ECDH key exchange algorithm?
    if(ikeIsEcdhKeyExchangeAlgo(sa->dhGroupNum))
    {
-      const EcCurveInfo *curveInfo;
+      const EcCurve *curve;
 
       //Get the elliptic curve that matches the specified group number
-      curveInfo = ikeGetEcdhCurveInfo(sa->dhGroupNum);
+      curve = ikeGetEcdhCurve(sa->dhGroupNum);
 
       //Valid elliptic curve?
-      if(curveInfo != NULL)
+      if(curve != NULL)
       {
          //Montgomery or Weierstrass curve?
          if(sa->dhGroupNum == IKE_TRANSFORM_ID_DH_GROUP_CURVE25519 ||
             sa->dhGroupNum == IKE_TRANSFORM_ID_DH_GROUP_CURVE448)
          {
-            //Format public key
-            error = mpiExport(&sa->ecdhContext.qa.q.x, p, curveInfo->pLen,
-               MPI_FORMAT_LITTLE_ENDIAN);
-
-            //Check status code
-            if(!error)
-            {
-               //The Key Exchange Data consists of 32 or 56 octets (refer to
-               //RFC 8031, section 3.1)
-               *written = curveInfo->pLen;
-            }
+            //The Key Exchange Data consists of 32 or 56 octets (refer to
+            //RFC 8031, section 3.1)
+            error = ecExportPublicKey(&sa->ecdhContext.da.q, p, written,
+               EC_PUBLIC_KEY_FORMAT_RAW);
          }
          else
          {
-            //In an ECP key exchange, the Diffie-Hellman public value passed in
-            //a KE payload consists of two components, x and y, corresponding to
-            //the coordinates of an elliptic curve point
-            error = mpiExport(&sa->ecdhContext.qa.q.x, p, curveInfo->pLen,
-               MPI_FORMAT_BIG_ENDIAN);
-
-            //Check status code
-            if(!error)
-            {
-               //The Diffie-Hellman public value is obtained by concatenating
-               //the x and y values (refer to RFC 5903, section 7)
-               error = mpiExport(&sa->ecdhContext.qa.q.y, p + curveInfo->pLen,
-                  curveInfo->pLen, MPI_FORMAT_BIG_ENDIAN);
-            }
-
-            //Check status code
-            if(!error)
-            {
-               //Each component has a fixed bit length
-               *written = 2 * curveInfo->pLen;
-            }
+            //The Diffie-Hellman public value is obtained by concatenating the
+            //x and y values (refer to RFC 5903, section 7)
+            error = ecExportPublicKey(&sa->ecdhContext.da.q, p, written,
+               EC_PUBLIC_KEY_FORMAT_RAW);
          }
       }
       else
@@ -352,8 +338,7 @@ error_t ikeParseDhPublicKey(IkeSaEntry *sa, const uint8_t *p, size_t length)
             if(!error)
             {
                //Ensure the public key is acceptable
-               error = dhCheckPublicKey(&sa->dhContext.params,
-                  &sa->dhContext.yb);
+               error = dhCheckPublicKey(&sa->dhContext, &sa->dhContext.yb);
             }
          }
          else
@@ -374,71 +359,40 @@ error_t ikeParseDhPublicKey(IkeSaEntry *sa, const uint8_t *p, size_t length)
    //ECDH key exchange algorithm?
    if(ikeIsEcdhKeyExchangeAlgo(sa->dhGroupNum))
    {
-      const EcCurveInfo *curveInfo;
+      const EcCurve *curve;
 
       //Get the elliptic curve that matches the specified group number
-      curveInfo = ikeGetEcdhCurveInfo(sa->dhGroupNum);
+      curve = ikeGetEcdhCurve(sa->dhGroupNum);
 
       //Valid elliptic curve?
-      if(curveInfo != NULL)
+      if(curve != NULL)
       {
+         //Save elliptic curve parameters
+         sa->ecdhContext.curve = curve;
+
          //Montgomery or Weierstrass curve?
          if(sa->dhGroupNum == IKE_TRANSFORM_ID_DH_GROUP_CURVE25519 ||
             sa->dhGroupNum == IKE_TRANSFORM_ID_DH_GROUP_CURVE448)
          {
             //The Key Exchange Data consists of 32 or 56 octets (refer to
             //RFC 8031, section 3.1)
-            if(length == curveInfo->pLen)
-            {
-               //Load public key
-               error = mpiImport(&sa->ecdhContext.qb.q.x, p, curveInfo->pLen,
-                  MPI_FORMAT_LITTLE_ENDIAN);
-            }
-            else
-            {
-               //Report an error
-               error = ERROR_INVALID_SYNTAX;
-            }
+            error = ecImportPublicKey(&sa->ecdhContext.qb, curve, p, length,
+               EC_PUBLIC_KEY_FORMAT_RAW);
          }
          else
          {
             //In an ECP key exchange, the Diffie-Hellman public value passed in
             //a KE payload consists of two components, x and y, corresponding to
             //the coordinates of an elliptic curve point
-            if(length == (2 * curveInfo->pLen))
+            error = ecImportPublicKey(&sa->ecdhContext.qb, curve, p, length,
+               EC_PUBLIC_KEY_FORMAT_RAW);
+
+            //Check status code
+            if(!error)
             {
-               //Load EC parameters
-               error = ikeLoadEcdhParams(&sa->ecdhContext.params,
-                  sa->dhGroupNum);
-
-               //Check status code
-               if(!error)
-               {
-                  //Load x value
-                  error = mpiImport(&sa->ecdhContext.qb.q.x, p, curveInfo->pLen,
-                     MPI_FORMAT_BIG_ENDIAN);
-               }
-
-               //Check status code
-               if(!error)
-               {
-                  //Load y value
-                  error = mpiImport(&sa->ecdhContext.qb.q.y, p + curveInfo->pLen,
-                     curveInfo->pLen, MPI_FORMAT_BIG_ENDIAN);
-               }
-
-               //Check status code
-               if(!error)
-               {
-                  //Ensure the public key is acceptable
-                  error = ecdhCheckPublicKey(&sa->ecdhContext.params,
-                     &sa->ecdhContext.qb.q);
-               }
-            }
-            else
-            {
-               //Report an error
-               error = ERROR_INVALID_SYNTAX;
+               //Ensure the public key is acceptable
+               error = ecdhCheckPublicKey(&sa->ecdhContext,
+                  &sa->ecdhContext.qb);
             }
          }
       }

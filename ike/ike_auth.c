@@ -6,7 +6,7 @@
  *
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * Copyright (C) 2022-2024 Oryx Embedded SARL. All rights reserved.
+ * Copyright (C) 2022-2025 Oryx Embedded SARL. All rights reserved.
  *
  * This file is part of CycloneIPSEC Open.
  *
@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.4.4
+ * @version 2.5.0
  **/
 
 //Switch to the appropriate trace level
@@ -241,7 +241,7 @@ error_t ikeVerifyAuth(IkeSaEntry *sa, IpsecPadEntry *padEntry,
       //Pre-shared key authentication?
       if(authMethod == IKE_AUTH_METHOD_SHARED_KEY)
       {
-         uint8_t mac[MAX_HASH_DIGEST_SIZE];
+         uint8_t mac[IKE_MAX_DIGEST_SIZE];
 
          //The CERT payload must not be included
          if(certPayload == NULL)
@@ -312,8 +312,8 @@ error_t ikeComputeMacAuth(IkeSaEntry *sa, const uint8_t *key, size_t keyLen,
 {
 #if (IKE_PSK_AUTH_SUPPORT == ENABLED)
    error_t error;
-   uint8_t macId[MAX_HASH_DIGEST_SIZE];
-   uint8_t macKey[MAX_HASH_DIGEST_SIZE];
+   uint8_t macId[IKE_MAX_DIGEST_SIZE];
+   uint8_t macKey[IKE_MAX_DIGEST_SIZE];
 
    //Derive the shared secret from the password
    error = ikeComputePrf(sa, key, keyLen, "Key Pad for IKEv2", 17, macKey);
