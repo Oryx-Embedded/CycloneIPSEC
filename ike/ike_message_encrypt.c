@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.5.0
+ * @version 2.5.2
  **/
 
 //Switch to the appropriate trace level
@@ -137,7 +137,7 @@ error_t ikeEncryptMessage(IkeSaEntry *sa, uint8_t *message, size_t *messageLen)
 
       //Senders must select a new unpredictable IV for every message (refer
       //to RFC 7296, section 3.14)
-      error = context->prngAlgo->read(context->prngContext, iv, sa->ivLen);
+      error = context->prngAlgo->generate(context->prngContext, iv, sa->ivLen);
       //Any error to report?
       if(error)
          return error;

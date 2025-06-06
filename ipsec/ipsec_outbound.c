@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.5.0
+ * @version 2.5.2
  **/
 
 //Dependencies
@@ -346,13 +346,19 @@ error_t ipsecProtectIpv4Packet(IpsecContext *context, IpsecSadEntry *sa,
       //ESP protocol?
       if(sa->protocol == IPSEC_PROTOCOL_ESP)
       {
+         size_t n;
          size_t offset2;
          NetBuffer *buffer2;
          Ipv4PseudoHeader pseudoHeader2;
          EspHeader *espHeader;
 
-         //Sanity check
-         if((length + sizeof(EspHeader)) > ESP_BUFFER_SIZE)
+         //The sender may add 0 to 255 bytes of padding
+         n = espComputePadLength(sa, length);
+         //Calculate the overhead caused by ESP encryption
+         n += sizeof(EspHeader) + sizeof(EspTrailer) + sa->ivLen + sa->icvLen;
+
+         //Check the length of the resulting ESP packet
+         if((length + n) > ESP_BUFFER_SIZE)
             return ERROR_FAILURE;
 
          //The ESP header is inserted after the IP header and before the

@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.5.0
+ * @version 2.5.2
  **/
 
 //Switch to the appropriate trace level
@@ -383,6 +383,8 @@ error_t ahSelectSaProposal(IkeChildSaEntry *childSa, const IkeSaPayload *payload
             {
                //Select AH security protocol
                childSa->protocol = IPSEC_PROTOCOL_AH;
+               //Save the number of the proposal that was accepted
+               childSa->acceptedProposalNum = proposal->proposalNum;
 
                //The initiator SPI is supplied in the SPI field of the SA
                //payload

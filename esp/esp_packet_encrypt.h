@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.5.0
+ * @version 2.5.2
  **/
 
 #ifndef _ESP_PACKET_ENCRYPT_H
@@ -48,6 +48,8 @@ error_t espEncryptPacket(IpsecContext *context, IpsecSadEntry *sa,
 error_t espComputeChecksum(IpsecContext *context, IpsecSadEntry *sa,
    const EspHeader *espHeader, const uint8_t *payload, size_t length,
    uint8_t *icv);
+
+size_t espComputePadLength(IpsecSadEntry *sa, size_t length);
 
 size_t espAddTrailer(IpsecSadEntry *sa, uint8_t *data, size_t length,
    uint8_t nextHeader);

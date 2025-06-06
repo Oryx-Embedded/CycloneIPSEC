@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.5.0
+ * @version 2.5.2
  **/
 
 //Switch to the appropriate trace level
@@ -545,7 +545,8 @@ error_t ikeGenerateSaSpi(IkeSaEntry *sa, uint8_t *spi)
    do
    {
       //Generate an arbitrary 8-octet value
-      error = context->prngAlgo->read(context->prngContext, spi, IKE_SPI_SIZE);
+      error = context->prngAlgo->generate(context->prngContext, spi,
+         IKE_SPI_SIZE);
 
       //Check status code
       if(!error)
@@ -629,7 +630,7 @@ error_t ikeGenerateChildSaSpi(IkeChildSaEntry *childSa, uint8_t *spi)
    do
    {
       //Generate an arbitrary 4-octet value
-      error = context->prngAlgo->read(context->prngContext, spi,
+      error = context->prngAlgo->generate(context->prngContext, spi,
          IPSEC_SPI_SIZE);
 
       //Check status code
@@ -695,7 +696,7 @@ error_t ikeGenerateNonce(IkeContext *context, uint8_t *nonce, size_t *length)
 
    //Nonces used in IKEv2 must be randomly chosen and must be at least 128 bits
    //in size (refer to RFC 7296, section 2.10)
-   error = context->prngAlgo->read(context->prngContext, nonce,
+   error = context->prngAlgo->generate(context->prngContext, nonce,
       IKE_DEFAULT_NONCE_SIZE);
 
    //Check status code
@@ -733,8 +734,8 @@ systime_t ikeRandomizeDelay(IkeContext *context, systime_t delay)
    if(delta > 0)
    {
       //Generate a random value
-      error = context->prngAlgo->read(context->prngContext, (uint8_t *) &value,
-         sizeof(value));
+      error = context->prngAlgo->generate(context->prngContext,
+         (uint8_t *) &value, sizeof(value));
 
       //Check status code
       if(!error)
@@ -1077,6 +1078,14 @@ error_t ikeCreateIpsecSaPair(IkeChildSaEntry *childSa)
       osMemcpy(sadEntry.encKey, childSa->sker, childSa->encKeyLen +
          childSa->saltLen);
    }
+
+   //Check encryption mode
+   if(childSa->protocol == IPSEC_PROTOCOL_ESP &&
+      childSa->cipherMode != CIPHER_MODE_CBC)
+   {
+      //Copy initialization vector
+      osMemcpy(sadEntry.iv, childSa->iv, childSa->ivLen);
+   }
 #endif
 
    //Update SAD entry (outbound traffic)
@@ -1111,7 +1120,7 @@ error_t ikeCreateIpsecSaPair(IkeChildSaEntry *childSa)
          osMemcpy(sadEntry.authKey, childSa->skai, childSa->authKeyLen);
       }
 
-   #if (ESP_SUPPORT == ENABLED)
+#if (ESP_SUPPORT == ENABLED)
       //Set encryption parameters
       sadEntry.cipherMode = childSa->cipherMode;
       sadEntry.cipherAlgo = childSa->cipherAlgo;
@@ -1130,7 +1139,7 @@ error_t ikeCreateIpsecSaPair(IkeChildSaEntry *childSa)
          osMemcpy(sadEntry.encKey, childSa->skei, childSa->encKeyLen +
             childSa->saltLen);
       }
-   #endif
+#endif
 
       //Update SAD entry (inbound traffic)
       error = ipsecSetSadEntry(netContext.ipsecContext, childSa->inboundSa,

@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.5.0
+ * @version 2.5.2
  **/
 
 //Switch to the appropriate trace level
@@ -1263,6 +1263,11 @@ error_t espSelectSaProposal(IkeChildSaEntry *childSa, const IkeSaPayload *payloa
                childSa->encAlgoId = encAlgo->id;
                childSa->encKeyLen = encAlgo->keyLen;
             }
+            else
+            {
+               childSa->encAlgoId = IKE_TRANSFORM_ID_INVALID;
+               childSa->encKeyLen = 0;
+            }
 
             //AEAD algorithm?
             if(ikeIsAeadEncAlgo(childSa->encAlgoId))
@@ -1289,6 +1294,8 @@ error_t espSelectSaProposal(IkeChildSaEntry *childSa, const IkeSaPayload *payloa
             {
                //Select ESP security protocol
                childSa->protocol = IPSEC_PROTOCOL_ESP;
+               //Save the number of the proposal that was accepted
+               childSa->acceptedProposalNum = proposal->proposalNum;
 
                //The initiator SPI is supplied in the SPI field of the SA
                //payload

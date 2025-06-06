@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.5.0
+ * @version 2.5.2
  **/
 
 //Switch to the appropriate trace level
@@ -236,6 +236,14 @@ error_t ipsecSetSadEntry(IpsecContext *context, uint_t index,
    //Set encryption key
    osMemcpy(entry->encKey, params->encKey, params->encKeyLen +
       params->saltLen);
+
+   //Check encryption mode
+   if(params->protocol == IPSEC_PROTOCOL_ESP &&
+      params->cipherMode != CIPHER_MODE_CBC)
+   {
+      //Copy initialization vector
+      osMemcpy(entry->iv, params->iv, params->ivLen);
+   }
 #endif
 
    //ESP and AH SA use secret keys that should be used only for a limited

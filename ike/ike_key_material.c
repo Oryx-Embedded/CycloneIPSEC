@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.5.0
+ * @version 2.5.2
  **/
 
 //Switch to the appropriate trace level
@@ -237,7 +237,7 @@ error_t ikeGenerateSaKeyMaterial(IkeSaEntry *sa, IkeSaEntry *oldSa)
       //The IV must be chosen by the encryptor in a manner that ensures that
       //the same IV value is used only once for a given key (refer to RFC 5282,
       //section 3.1)
-      error = context->prngAlgo->read(context->prngContext, sa->iv, 8);
+      error = context->prngAlgo->generate(context->prngContext, sa->iv, 8);
       //Any error to report?
       if(error)
          return error;
@@ -391,7 +391,7 @@ error_t ikeGenerateChildSaKeyMaterial(IkeChildSaEntry *childSa)
 
       //The IV must be chosen by the encryptor in a manner that ensures that
       //the same IV value is used only once for a given key
-      error = context->prngAlgo->read(context->prngContext, childSa->iv, 8);
+      error = context->prngAlgo->generate(context->prngContext, childSa->iv, 8);
       //Any error to report?
       if(error)
          return error;

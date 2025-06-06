@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.5.0
+ * @version 2.5.2
  **/
 
 //Switch to the appropriate trace level
@@ -155,6 +155,10 @@ error_t ipv4ProcessEspHeader(NetInterface *interface,
    //Point to the payload data
    offset += sizeof(EspHeader);
    length -= sizeof(EspHeader);
+
+   //Check the length of the payload data
+   if(length > ESP_BUFFER_SIZE)
+      return ERROR_INVALID_LENGTH;
 
    //Copy the payload data to be decrypted
    netBufferRead(context->buffer, buffer, offset, length);

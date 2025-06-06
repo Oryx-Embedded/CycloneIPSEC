@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.5.0
+ * @version 2.5.2
  **/
 
 //Switch to the appropriate trace level
@@ -152,7 +152,6 @@ error_t ikeFormatSaProposal(IkeSaEntry *sa, const uint8_t *spi, uint8_t *p,
    proposal->lastSubstruc = IKE_LAST_SUBSTRUC_LAST;
    proposal->reserved = 0;
    proposal->proposalLength = 0;
-   proposal->proposalNum = 1;
    proposal->protocolId = IKE_PROTOCOL_ID_IKE;
    proposal->spiSize = (spi != NULL) ? IKE_SPI_SIZE : 0;
    proposal->numTransforms = 0;
@@ -180,6 +179,11 @@ error_t ikeFormatSaProposal(IkeSaEntry *sa, const uint8_t *spi, uint8_t *p,
    //Check whether the entity is the original initiator of the IKE SA
    if(sa->originalInitiator)
    {
+      //When a proposal is made, the first proposal in an SA payload must be 1,
+      //and subsequent proposals must be one more than the previous proposal
+      //(refer to RFC 7296, section 3.3.1)
+      proposal->proposalNum = 1;
+
       //IKE generally has four transforms: a Diffie-Hellman group, an
       //integrity check algorithm, a PRF algorithm, and an encryption
       //algorithm
@@ -190,6 +194,11 @@ error_t ikeFormatSaProposal(IkeSaEntry *sa, const uint8_t *spi, uint8_t *p,
    }
    else
    {
+      //When a proposal is accepted, the proposal number in the SA payload must
+      //match the number on the proposal sent that was accepted (refer to
+      //RFC 7296, section 3.3.1)
+      proposal->proposalNum = sa->acceptedProposalNum;
+
       //The accepted cryptographic suite must contain exactly one encryption
       //transform
       error = ikeAddTransform(IKE_TRANSFORM_TYPE_ENCR, sa->encAlgoId,
@@ -272,7 +281,6 @@ error_t ikeFormatChildSaProposal(IkeChildSaEntry *childSa,
    proposal->lastSubstruc = IKE_LAST_SUBSTRUC_LAST;
    proposal->reserved = 0;
    proposal->proposalLength = 0;
-   proposal->proposalNum = 1;
    proposal->protocolId = protocolId;
    proposal->spiSize = IPSEC_SPI_SIZE;
    proposal->numTransforms = 0;
@@ -297,6 +305,11 @@ error_t ikeFormatChildSaProposal(IkeChildSaEntry *childSa,
    //exchange
    if(childSa->initiator)
    {
+      //When a proposal is made, the first proposal in an SA payload must be 1,
+      //and subsequent proposals must be one more than the previous proposal
+      //(refer to RFC 7296, section 3.3.1)
+      proposal->proposalNum = 1;
+
 #if (AH_SUPPORT == ENABLED)
       //AH protocol identifier?
       if(protocolId == IPSEC_PROTOCOL_AH)
@@ -331,6 +344,11 @@ error_t ikeFormatChildSaProposal(IkeChildSaEntry *childSa,
    }
    else
    {
+      //When a proposal is accepted, the proposal number in the SA payload must
+      //match the number on the proposal sent that was accepted (refer to
+      //RFC 7296, section 3.3.1)
+      proposal->proposalNum = childSa->acceptedProposalNum;
+
 #if (AH_SUPPORT == ENABLED)
       //AH protocol identifier?
       if(protocolId == IPSEC_PROTOCOL_AH)

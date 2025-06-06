@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.5.0
+ * @version 2.5.2
  **/
 
 //Switch to the appropriate trace level
@@ -1799,6 +1799,11 @@ error_t ikeSelectSaProposal(IkeSaEntry *sa, const IkeSaPayload *payload,
             sa->encAlgoId = encAlgo->id;
             sa->encKeyLen = encAlgo->keyLen;
          }
+         else
+         {
+            sa->encAlgoId = IKE_TRANSFORM_ID_INVALID;
+            sa->encKeyLen = 0;
+         }
 
          //AEAD algorithm?
          if(ikeIsAeadEncAlgo(sa->encAlgoId))
@@ -1820,6 +1825,9 @@ error_t ikeSelectSaProposal(IkeSaEntry *sa, const IkeSaPayload *payload,
             sa->encAlgoId != IKE_TRANSFORM_ID_INVALID &&
             sa->authAlgoId != IKE_TRANSFORM_ID_INVALID)
          {
+            //Save the number of the proposal that was accepted
+            sa->acceptedProposalNum = proposal->proposalNum;
+
             //A new initiator SPI is supplied in the SPI field of the SA
             //payload (refer to RFC 7296, section 1.3.2)
             if(spiSize != 0)

@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.5.0
+ * @version 2.5.2
  **/
 
 //Switch to the appropriate trace level
@@ -89,7 +89,7 @@ error_t espEncryptPacket(IpsecContext *context, IpsecSadEntry *sa,
       uint8_t iv[MAX_CIPHER_BLOCK_SIZE];
 
       //The IV must be chosen at random, and must be unpredictable
-      error = context->prngAlgo->read(context->prngContext, iv, sa->ivLen);
+      error = context->prngAlgo->generate(context->prngContext, iv, sa->ivLen);
       //Any error to report?
       if(error)
          return error;
@@ -448,20 +448,15 @@ error_t espComputeChecksum(IpsecContext *context, IpsecSadEntry *sa,
 
 
 /**
- * @brief Append ESP trailer
+ * @brief Compute the number of padding bytes
  * @param[in] sa Pointer to the SAD entry
- * @param[in] data Pointer to the payload data
  * @param[in] length Length of the payload data, in bytes
- * @param[in] nextHeader Value of the next header field
- * @return Length of the resulting payload data
+ * @return Number of padding bytes
  **/
 
-size_t espAddTrailer(IpsecSadEntry *sa, uint8_t *data, size_t length,
-   uint8_t nextHeader)
+size_t espComputePadLength(IpsecSadEntry *sa, size_t length)
 {
-   size_t i;
    size_t n;
-   EspTrailer *espTrailer;
 
 #if (ESP_CBC_SUPPORT == ENABLED)
    //CBC cipher mode?
@@ -496,6 +491,30 @@ size_t espAddTrailer(IpsecSadEntry *sa, uint8_t *data, size_t length,
          n = 4 - n;
       }
    }
+
+   //Return the number of padding bytes
+   return n;
+}
+
+
+/**
+ * @brief Append ESP trailer
+ * @param[in] sa Pointer to the SAD entry
+ * @param[in] data Pointer to the payload data
+ * @param[in] length Length of the payload data, in bytes
+ * @param[in] nextHeader Value of the next header field
+ * @return Length of the resulting payload data
+ **/
+
+size_t espAddTrailer(IpsecSadEntry *sa, uint8_t *data, size_t length,
+   uint8_t nextHeader)
+{
+   size_t i;
+   size_t n;
+   EspTrailer *espTrailer;
+
+   //The sender may add 0 to 255 bytes of padding
+   n = espComputePadLength(sa, length);
 
    //Padding bytes make up a monotonically increasing sequence
    for(i = 1; i <= n; i++)

@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.5.0
+ * @version 2.5.2
  **/
 
 //Switch to the appropriate trace level
@@ -127,11 +127,15 @@ error_t ikeGenerateDhKeyPair(IkeSaEntry *sa)
       if(curve != NULL)
       {
          //Save elliptic curve parameters
-         sa->ecdhContext.curve = curve;
+         error = ecdhSetCurve(&sa->ecdhContext, curve);
 
-         //Generate an ephemeral key pair
-         error = ecdhGenerateKeyPair(&sa->ecdhContext, context->prngAlgo,
-            context->prngContext);
+         //Check status code
+         if(!error)
+         {
+            //Generate an ephemeral key pair
+            error = ecdhGenerateKeyPair(&sa->ecdhContext, context->prngAlgo,
+               context->prngContext);
+         }
       }
       else
       {
@@ -214,34 +218,12 @@ error_t ikeFormatDhPublicKey(IkeSaEntry *sa, uint8_t *p, size_t *written)
    //Diffie-Hellman key exchange algorithm?
    if(ikeIsDhKeyExchangeAlgo(sa->dhGroupNum))
    {
-      const IkeDhGroup *dhGroup;
-
-      //Get the Diffie-Hellman group that matches the specified group number
-      dhGroup = ikeGetDhGroup(sa->dhGroupNum);
-
-      //Valid Diffie-Hellman group?
-      if(dhGroup != NULL)
-      {
-         //A Key Exchange payload is constructed by copying one's Diffie-Hellman
-         //public value into the Key Exchange Data portion of the payload
-         error = mpiExport(&sa->dhContext.ya, p, dhGroup->pLen,
-            MPI_FORMAT_BIG_ENDIAN);
-      }
-      else
-      {
-         //Report an error
-         error = ERROR_UNSUPPORTED_TYPE;
-      }
-
-      //Check status code
-      if(!error)
-      {
-         //The length of the Diffie-Hellman public value for MODP groups must
-         //be equal to the length of the prime modulus over which the
-         //exponentiation was performed, prepending zero bits to the value if
-         //necessary (refer to RFC 7296, section 3.4)
-         *written = dhGroup->pLen;
-      }
+      //The length of the Diffie-Hellman public value for MODP groups must be
+      //equal to the length of the prime modulus over which the exponentiation
+      //was performed, prepending zero bits to the value if necessary (refer
+      //to RFC 7296, section 3.4)
+      error = dhExportPublicKey(&sa->dhContext, p, written,
+         MPI_FORMAT_BIG_ENDIAN);
    }
    else
 #endif
@@ -249,36 +231,10 @@ error_t ikeFormatDhPublicKey(IkeSaEntry *sa, uint8_t *p, size_t *written)
    //ECDH key exchange algorithm?
    if(ikeIsEcdhKeyExchangeAlgo(sa->dhGroupNum))
    {
-      const EcCurve *curve;
-
-      //Get the elliptic curve that matches the specified group number
-      curve = ikeGetEcdhCurve(sa->dhGroupNum);
-
-      //Valid elliptic curve?
-      if(curve != NULL)
-      {
-         //Montgomery or Weierstrass curve?
-         if(sa->dhGroupNum == IKE_TRANSFORM_ID_DH_GROUP_CURVE25519 ||
-            sa->dhGroupNum == IKE_TRANSFORM_ID_DH_GROUP_CURVE448)
-         {
-            //The Key Exchange Data consists of 32 or 56 octets (refer to
-            //RFC 8031, section 3.1)
-            error = ecExportPublicKey(&sa->ecdhContext.da.q, p, written,
-               EC_PUBLIC_KEY_FORMAT_RAW);
-         }
-         else
-         {
-            //The Diffie-Hellman public value is obtained by concatenating the
-            //x and y values (refer to RFC 5903, section 7)
-            error = ecExportPublicKey(&sa->ecdhContext.da.q, p, written,
-               EC_PUBLIC_KEY_FORMAT_RAW);
-         }
-      }
-      else
-      {
-         //Report an error
-         error = ERROR_UNSUPPORTED_TYPE;
-      }
+      //The Diffie-Hellman public value is obtained by concatenating the x and
+      //y values (refer to RFC 5903, section 7)
+      error = ecdhExportPublicKey(&sa->ecdhContext, p, written,
+         EC_PUBLIC_KEY_FORMAT_RAW);
    }
    else
 #endif
@@ -330,15 +286,8 @@ error_t ikeParseDhPublicKey(IkeSaEntry *sa, const uint8_t *p, size_t length)
             if(!error)
             {
                //Load peer's Diffie-Hellman public value
-               error = mpiImport(&sa->dhContext.yb, p, length,
+               error = dhImportPeerPublicKey(&sa->dhContext, p, length,
                   MPI_FORMAT_BIG_ENDIAN);
-            }
-
-            //Check status code
-            if(!error)
-            {
-               //Ensure the public key is acceptable
-               error = dhCheckPublicKey(&sa->dhContext, &sa->dhContext.yb);
             }
          }
          else
@@ -368,32 +317,16 @@ error_t ikeParseDhPublicKey(IkeSaEntry *sa, const uint8_t *p, size_t length)
       if(curve != NULL)
       {
          //Save elliptic curve parameters
-         sa->ecdhContext.curve = curve;
+         error = ecdhSetCurve(&sa->ecdhContext, curve);
 
-         //Montgomery or Weierstrass curve?
-         if(sa->dhGroupNum == IKE_TRANSFORM_ID_DH_GROUP_CURVE25519 ||
-            sa->dhGroupNum == IKE_TRANSFORM_ID_DH_GROUP_CURVE448)
-         {
-            //The Key Exchange Data consists of 32 or 56 octets (refer to
-            //RFC 8031, section 3.1)
-            error = ecImportPublicKey(&sa->ecdhContext.qb, curve, p, length,
-               EC_PUBLIC_KEY_FORMAT_RAW);
-         }
-         else
+         //Check status code
+         if(!error)
          {
             //In an ECP key exchange, the Diffie-Hellman public value passed in
             //a KE payload consists of two components, x and y, corresponding to
             //the coordinates of an elliptic curve point
-            error = ecImportPublicKey(&sa->ecdhContext.qb, curve, p, length,
+            error = ecdhImportPeerPublicKey(&sa->ecdhContext, p, length,
                EC_PUBLIC_KEY_FORMAT_RAW);
-
-            //Check status code
-            if(!error)
-            {
-               //Ensure the public key is acceptable
-               error = ecdhCheckPublicKey(&sa->ecdhContext,
-                  &sa->ecdhContext.qb);
-            }
          }
       }
       else

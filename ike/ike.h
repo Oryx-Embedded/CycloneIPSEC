@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.5.0
+ * @version 2.5.2
  **/
 
 #ifndef _IKE_H
@@ -1766,6 +1766,7 @@ struct _IkeSaEntry
    uint32_t rxMessageId;
    uint8_t cookie[IKE_MAX_COOKIE_SIZE]; ///<Cookie
    size_t cookieLen;                    ///<Length of the cookie, in bytes
+
    uint8_t initiatorSpi[IKE_SPI_SIZE];  ///<Initiator SPI
    uint8_t responderSpi[IKE_SPI_SIZE];  ///<Responder SPI
 
@@ -1787,6 +1788,7 @@ struct _IkeSaEntry
    uint16_t prfAlgoId;                  ///<Pseudorandom function
    uint16_t authAlgoId;                 ///<Integrity algorithm
    uint16_t dhGroupNum;                 ///<Diffie-Hellman group number
+   uint8_t acceptedProposalNum;         ///<Number of the accepted proposal
 
    uint8_t sharedSecret[IKE_MAX_SHARED_SECRET_LEN]; ///<Shared secret
    size_t sharedSecretLen;              ///<Length of the shared secret, in bytes
@@ -1861,15 +1863,19 @@ struct _IkeChildSaEntry
    IpsecProtocol protocol;             ///<Security protocol (AH or ESP)
    bool_t initiator;                   ///<Initiator of the CREATE_CHILD_SA exchange
    systime_t lifetimeStart;
+
+   uint8_t localSpi[4];                ///<Initiator SPI
+   uint8_t remoteSpi[4];               ///<Responder SPI
+
    uint8_t initiatorNonce[IKE_MAX_NONCE_SIZE]; ///<Initiator nonce
    size_t initiatorNonceLen;           ///<Length of the initiator nonce
    uint8_t responderNonce[IKE_MAX_NONCE_SIZE]; ///<Responder nonce
    size_t responderNonceLen;           ///<Length of the responder nonce
-   uint8_t localSpi[4];
-   uint8_t remoteSpi[4];
+
    uint16_t encAlgoId;                 ///<Encryption algorithm
    uint16_t authAlgoId;                ///<Integrity algorithm
    uint16_t esn;                       ///<Extended sequence numbers
+   uint8_t acceptedProposalNum;        ///<Number of the accepted proposal
 
    uint8_t keyMaterial[IKE_MAX_CHILD_SA_KEY_MAT_LEN]; ///<Keying material
    const uint8_t *skai;                ///<Integrity protection key (initiator)
