@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.5.2
+ * @version 2.5.4
  **/
 
 //Switch to the appropriate trace level
@@ -47,7 +47,12 @@ static const IkeParamName ikeExchangeTypeList[] =
    {IKE_EXCHANGE_TYPE_CREATE_CHILD_SA,    "CREATE_CHILD_SA"},
    {IKE_EXCHANGE_TYPE_INFORMATIONAL,      "INFORMATIONAL"},
    {IKE_EXCHANGE_TYPE_IKE_SESSION_RESUME, "IKE_SESSION_RESUME"},
-   {IKE_EXCHANGE_TYPE_IKE_INTERMEDIATE,   "IKE_INTERMEDIATE"}
+   {IKE_EXCHANGE_TYPE_GSA_AUTH,           "GSA_AUTH"},
+   {IKE_EXCHANGE_TYPE_GSA_REGISTRATION,   "GSA_REGISTRATION"},
+   {IKE_EXCHANGE_TYPE_GSA_REKEY,          "GSA_REKEY"},
+   {IKE_EXCHANGE_TYPE_GSA_INBAND_REKEY,   "GSA_INBAND_REKEY"},
+   {IKE_EXCHANGE_TYPE_IKE_INTERMEDIATE,   "IKE_INTERMEDIATE"},
+   {IKE_EXCHANGE_TYPE_IKE_FOLLOWUP_KE,    "IKE_FOLLOWUP_KE"}
 };
 
 //Payload types
@@ -71,6 +76,9 @@ static const IkeParamName ikePayloadList[] =
    {IKE_PAYLOAD_TYPE_CP,      "Configuration"},
    {IKE_PAYLOAD_TYPE_EAP,     "Extensible Authentication"},
    {IKE_PAYLOAD_TYPE_GSPM,    "Generic Secure Password Method"},
+   {IKE_PAYLOAD_TYPE_IDG,     "Group Identification"},
+   {IKE_PAYLOAD_TYPE_GSA,     "Group Security Association"},
+   {IKE_PAYLOAD_TYPE_KD,      "Key Download"},
    {IKE_PAYLOAD_TYPE_SKF,     "Encrypted and Authenticated Fragment"},
    {IKE_PAYLOAD_TYPE_PS,      "Puzzle Solution"}
 };
@@ -86,19 +94,31 @@ static const IkeParamName ikeLastSubstrucList[] =
 //Protocol IDs
 static const IkeParamName ikeProtocolIdList[] =
 {
-   {IKE_PROTOCOL_ID_IKE, "IKE"},
-   {IKE_PROTOCOL_ID_AH,  "AH"},
-   {IKE_PROTOCOL_ID_ESP, "ESP"}
+   {IKE_PROTOCOL_ID_IKE,                  "IKE"},
+   {IKE_PROTOCOL_ID_AH,                   "AH"},
+   {IKE_PROTOCOL_ID_ESP,                  "ESP"},
+   {IKE_PROTOCOL_ID_FC_ESP_HEADER,        "FC_ESP_HEADER"},
+   {IKE_PROTOCOL_ID_FC_CT_AUTHENTICATION, "FC_CT_AUTHENTICATION"},
+   {IKE_PROTOCOL_ID_GIKE_UPDATE,          "GIKE_UPDATE"}
 };
 
 //Transform types
 static const IkeParamName ikeTransformTypeList[] =
 {
-   {IKE_TRANSFORM_TYPE_ENCR,  "Encryption Algorithm"},
-   {IKE_TRANSFORM_TYPE_PRF,   "Pseudorandom Function"},
-   {IKE_TRANSFORM_TYPE_INTEG, "Integrity Algorithm"},
-   {IKE_TRANSFORM_TYPE_DH,    "Diffie-Hellman Group"},
-   {IKE_TRANSFORM_TYPE_ESN,   "Extended Sequence Numbers"}
+   {IKE_TRANSFORM_TYPE_ENCR,   "Encryption Algorithm"},
+   {IKE_TRANSFORM_TYPE_PRF,    "Pseudorandom Function"},
+   {IKE_TRANSFORM_TYPE_INTEG,  "Integrity Algorithm"},
+   {IKE_TRANSFORM_TYPE_DH,     "Diffie-Hellman Group"},
+   {IKE_TRANSFORM_TYPE_ESN,    "Extended Sequence Numbers"},
+   {IKE_TRANSFORM_TYPE_ADDKE1, "Additional Key Exchange 1"},
+   {IKE_TRANSFORM_TYPE_ADDKE2, "Additional Key Exchange 2"},
+   {IKE_TRANSFORM_TYPE_ADDKE3, "Additional Key Exchange 3"},
+   {IKE_TRANSFORM_TYPE_ADDKE4, "Additional Key Exchange 4"},
+   {IKE_TRANSFORM_TYPE_ADDKE5, "Additional Key Exchange 5"},
+   {IKE_TRANSFORM_TYPE_ADDKE6, "Additional Key Exchange 6"},
+   {IKE_TRANSFORM_TYPE_ADDKE7, "Additional Key Exchange 7"},
+   {IKE_TRANSFORM_TYPE_KWA,    "Key Wrap Algorithm"},
+   {IKE_TRANSFORM_TYPE_GCAUTH, "Group Controller Authentication Method"}
 };
 
 //Encryption algorithms
@@ -269,7 +289,7 @@ static const IkeParamName ikeAuthMethodList[] =
    {IKE_AUTH_METHOD_ECDSA_P521_SHA512, "ECDSA with SHA-512 on the P-521 curve"},
    {IKE_AUTH_METHOD_GSPAM,             "Generic Secure Password Authentication Method"},
    {IKE_AUTH_METHOD_NULL,              "NULL Authentication"},
-   {IKE_AUTH_METHOD_DIGITAL_SIGN,      "Digital Signature"},
+   {IKE_AUTH_METHOD_DIGITAL_SIGN,      "Digital Signature"}
 };
 
 //Notify message types
@@ -298,6 +318,8 @@ static const IkeParamName ikeNotifyMsgTypeList[] =
    {IKE_NOTIFY_MSG_TYPE_INVALID_GROUP_ID,                    "INVALID_GROUP_ID"},
    {IKE_NOTIFY_MSG_TYPE_AUTHORIZATION_FAILED,                "AUTHORIZATION_FAILED"},
    {IKE_NOTIFY_MSG_TYPE_STATE_NOT_FOUND,                     "STATE_NOT_FOUND"},
+   {IKE_NOTIFY_MSG_TYPE_TS_MAX_QUEUE,                        "TS_MAX_QUEUE"},
+   {IKE_NOTIFY_MSG_TYPE_REGISTRATION_FAILED,                 "REGISTRATION_FAILED"},
    {IKE_NOTIFY_MSG_TYPE_INITIAL_CONTACT,                     "INITIAL_CONTACT"},
    {IKE_NOTIFY_MSG_TYPE_SET_WINDOW_SIZE,                     "SET_WINDOW_SIZE"},
    {IKE_NOTIFY_MSG_TYPE_ADDITIONAL_TS_POSSIBLE,              "ADDITIONAL_TS_POSSIBLE"},
@@ -343,7 +365,7 @@ static const IkeParamName ikeNotifyMsgTypeList[] =
    {IKE_NOTIFY_MSG_TYPE_PSK_CONFIRM,                         "PSK_CONFIRM"},
    {IKE_NOTIFY_MSG_TYPE_ERX_SUPPORTED,                       "ERX_SUPPORTED"},
    {IKE_NOTIFY_MSG_TYPE_IFOM_CAPABILITY,                     "IFOM_CAPABILITY"},
-   {IKE_NOTIFY_MSG_TYPE_SENDER_REQUEST_ID,                   "SENDER_REQUEST_ID"},
+   {IKE_NOTIFY_MSG_TYPE_GROUP_SENDER,                        "GROUP_SENDER"},
    {IKE_NOTIFY_MSG_TYPE_IKEV2_FRAGMENTATION_SUPPORTED,       "IKEV2_FRAGMENTATION_SUPPORTED"},
    {IKE_NOTIFY_MSG_TYPE_SIGNATURE_HASH_ALGORITHMS,           "SIGNATURE_HASH_ALGORITHMS"},
    {IKE_NOTIFY_MSG_TYPE_CLONE_IKE_SA_SUPPORTED,              "CLONE_IKE_SA_SUPPORTED"},
@@ -357,13 +379,19 @@ static const IkeParamName ikeNotifyMsgTypeList[] =
    {IKE_NOTIFY_MSG_TYPE_IP6_ALLOWED,                         "IP6_ALLOWED"},
    {IKE_NOTIFY_MSG_TYPE_ADDITIONAL_KEY_EXCHANGE,             "ADDITIONAL_KEY_EXCHANGE"},
    {IKE_NOTIFY_MSG_TYPE_USE_AGGFRAG,                         "USE_AGGFRAG"},
+   {IKE_NOTIFY_MSG_TYPE_SUPPORTED_AUTH_METHODS,              "SUPPORTED_AUTH_METHODS"},
+   {IKE_NOTIFY_MSG_TYPE_SA_RESOURCE_INFO,                    "SA_RESOURCE_INFO"},
+   {IKE_NOTIFY_MSG_TYPE_USE_PPK_INT,                         "USE_PPK_INT"},
+   {IKE_NOTIFY_MSG_TYPE_PPK_IDENTITY_KEY,                    "PPK_IDENTITY_KEY"}
 };
 
 //Traffic selector types
 static const IkeParamName ikeTsTypeList[] =
 {
    {IKE_TS_TYPE_IPV4_ADDR_RANGE, "TS_IPV4_ADDR_RANGE"},
-   {IKE_TS_TYPE_IPV6_ADDR_RANGE, "TS_IPV6_ADDR_RANGE"}
+   {IKE_TS_TYPE_IPV6_ADDR_RANGE, "TS_IPV6_ADDR_RANGE"},
+   {IKE_TS_TYPE_FC_ADDR_RANGE,   "TS_FC_ADDR_RANGE"},
+   {IKE_TS_TYPE_SECLABEL,        "TS_SECLABEL"}
 };
 
 //IP protocol IDs

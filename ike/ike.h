@@ -25,7 +25,7 @@
  * Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
  *
  * @author Oryx Embedded SARL (www.oryx-embedded.com)
- * @version 2.5.2
+ * @version 2.5.4
  **/
 
 #ifndef _IKE_H
@@ -820,7 +820,12 @@ typedef enum
    IKE_EXCHANGE_TYPE_CREATE_CHILD_SA    = 36, ///<CREATE_CHILD_SA
    IKE_EXCHANGE_TYPE_INFORMATIONAL      = 37, ///<INFORMATIONAL
    IKE_EXCHANGE_TYPE_IKE_SESSION_RESUME = 38, ///<IKE_SESSION_RESUME
-   IKE_EXCHANGE_TYPE_IKE_INTERMEDIATE   = 43  ///<IKE_INTERMEDIATE
+   IKE_EXCHANGE_TYPE_GSA_AUTH           = 39, ///<GSA_AUTH
+   IKE_EXCHANGE_TYPE_GSA_REGISTRATION   = 40, ///<GSA_REGISTRATION
+   IKE_EXCHANGE_TYPE_GSA_REKEY          = 41, ///<GSA_REKEY
+   IKE_EXCHANGE_TYPE_GSA_INBAND_REKEY   = 42, ///<GSA_INBAND_REKEY
+   IKE_EXCHANGE_TYPE_IKE_INTERMEDIATE   = 43, ///<IKE_INTERMEDIATE
+   IKE_EXCHANGE_TYPE_IKE_FOLLOWUP_KE    = 44  ///<IKE_FOLLOWUP_KE
 } IkeExchangeType;
 
 
@@ -860,6 +865,9 @@ typedef enum
    IKE_PAYLOAD_TYPE_CP      = 47, ///<Configuration
    IKE_PAYLOAD_TYPE_EAP     = 48, ///<Extensible Authentication
    IKE_PAYLOAD_TYPE_GSPM    = 49, ///<Generic Secure Password Method
+   IKE_PAYLOAD_TYPE_IDG     = 50, ///<Group Identification
+   IKE_PAYLOAD_TYPE_GSA     = 51, ///<Group Security Association
+   IKE_PAYLOAD_TYPE_KD      = 52, ///<Key Download
    IKE_PAYLOAD_TYPE_SKF     = 53, ///<Encrypted and Authenticated Fragment
    IKE_PAYLOAD_TYPE_PS      = 54  ///<Puzzle Solution
 } IkePayloadType;
@@ -883,9 +891,12 @@ typedef enum
 
 typedef enum
 {
-   IKE_PROTOCOL_ID_IKE = 1, ///<IKE protocol
-   IKE_PROTOCOL_ID_AH  = 2, ///<AH protocol
-   IKE_PROTOCOL_ID_ESP = 3  ///<ESP protocol
+   IKE_PROTOCOL_ID_IKE                  = 1, ///<IKE
+   IKE_PROTOCOL_ID_AH                   = 2, ///<AH
+   IKE_PROTOCOL_ID_ESP                  = 3, ///<ESP
+   IKE_PROTOCOL_ID_FC_ESP_HEADER        = 4, ///<FC_ESP_HEADER
+   IKE_PROTOCOL_ID_FC_CT_AUTHENTICATION = 5, ///<FC_CT_AUTHENTICATION
+   IKE_PROTOCOL_ID_GIKE_UPDATE          = 6  ///<GIKE_UPDATE
 } IkeProtocolId;
 
 
@@ -895,11 +906,20 @@ typedef enum
 
 typedef enum
 {
-   IKE_TRANSFORM_TYPE_ENCR  = 1, ///<Encryption Algorithm
-   IKE_TRANSFORM_TYPE_PRF   = 2, ///<Pseudorandom Function
-   IKE_TRANSFORM_TYPE_INTEG = 3, ///<Integrity Algorithm
-   IKE_TRANSFORM_TYPE_DH    = 4, ///<Diffie-Hellman Group
-   IKE_TRANSFORM_TYPE_ESN   = 5  ///<Extended Sequence Numbers
+   IKE_TRANSFORM_TYPE_ENCR   = 1,  ///<Encryption Algorithm
+   IKE_TRANSFORM_TYPE_PRF    = 2,  ///<Pseudorandom Function
+   IKE_TRANSFORM_TYPE_INTEG  = 3,  ///<Integrity Algorithm
+   IKE_TRANSFORM_TYPE_DH     = 4,  ///<Diffie-Hellman Group
+   IKE_TRANSFORM_TYPE_ESN    = 5,  ///<Extended Sequence Numbers
+   IKE_TRANSFORM_TYPE_ADDKE1 = 6,  ///<Additional Key Exchange 1
+   IKE_TRANSFORM_TYPE_ADDKE2 = 7,  ///<Additional Key Exchange 2
+   IKE_TRANSFORM_TYPE_ADDKE3 = 8,  ///<Additional Key Exchange 3
+   IKE_TRANSFORM_TYPE_ADDKE4 = 9,  ///<Additional Key Exchange 4
+   IKE_TRANSFORM_TYPE_ADDKE5 = 10, ///<Additional Key Exchange 5
+   IKE_TRANSFORM_TYPE_ADDKE6 = 11, ///<Additional Key Exchange 6
+   IKE_TRANSFORM_TYPE_ADDKE7 = 12, ///<Additional Key Exchange 7
+   IKE_TRANSFORM_TYPE_KWA    = 13, ///<Key Wrap Algorithm
+   IKE_TRANSFORM_TYPE_GCAUTH = 14  ///<Group Controller Authentication Method
 } IkeTransformType;
 
 
@@ -1146,7 +1166,9 @@ typedef enum
    IKE_NOTIFY_MSG_TYPE_CHILD_SA_NOT_FOUND                  = 44,    //RFC 7296
    IKE_NOTIFY_MSG_TYPE_INVALID_GROUP_ID                    = 45,    //Draft
    IKE_NOTIFY_MSG_TYPE_AUTHORIZATION_FAILED                = 46,    //Draft
-   IKE_NOTIFY_MSG_TYPE_STATE_NOT_FOUND                     = 47,    //Draft
+   IKE_NOTIFY_MSG_TYPE_STATE_NOT_FOUND                     = 47,    //RFC 9370
+   IKE_NOTIFY_MSG_TYPE_TS_MAX_QUEUE                        = 48,    //RFC 9611
+   IKE_NOTIFY_MSG_TYPE_REGISTRATION_FAILED                 = 49,    //Draft
    IKE_NOTIFY_MSG_TYPE_INITIAL_CONTACT                     = 16384, //RFC 7296
    IKE_NOTIFY_MSG_TYPE_SET_WINDOW_SIZE                     = 16385, //RFC 7296
    IKE_NOTIFY_MSG_TYPE_ADDITIONAL_TS_POSSIBLE              = 16386, //RFC 7296
@@ -1192,7 +1214,7 @@ typedef enum
    IKE_NOTIFY_MSG_TYPE_PSK_CONFIRM                         = 16426, //RFC 6631
    IKE_NOTIFY_MSG_TYPE_ERX_SUPPORTED                       = 16427, //RFC 6867
    IKE_NOTIFY_MSG_TYPE_IFOM_CAPABILITY                     = 16428, //Draft
-   IKE_NOTIFY_MSG_TYPE_SENDER_REQUEST_ID                   = 16429, //Draft
+   IKE_NOTIFY_MSG_TYPE_GROUP_SENDER                        = 16429, //Draft
    IKE_NOTIFY_MSG_TYPE_IKEV2_FRAGMENTATION_SUPPORTED       = 16430, //RFC 7383
    IKE_NOTIFY_MSG_TYPE_SIGNATURE_HASH_ALGORITHMS           = 16431, //RFC 7427
    IKE_NOTIFY_MSG_TYPE_CLONE_IKE_SA_SUPPORTED              = 16432, //RFC 7791
@@ -1204,10 +1226,12 @@ typedef enum
    IKE_NOTIFY_MSG_TYPE_INTERMEDIATE_EXCHANGE_SUPPORTED     = 16438, //RFC 9242
    IKE_NOTIFY_MSG_TYPE_IP4_ALLOWED                         = 16439, //RFC 8983
    IKE_NOTIFY_MSG_TYPE_IP6_ALLOWED                         = 16440, //RFC 8983
-   IKE_NOTIFY_MSG_TYPE_ADDITIONAL_KEY_EXCHANGE             = 16441, //Draft
-   IKE_NOTIFY_MSG_TYPE_USE_AGGFRAG                         = 16442, //Draft
-   IKE_NOTIFY_MSG_TYPE_R_U_THERE                           = 36136, //RFC 3706
-   IKE_NOTIFY_MSG_TYPE_R_U_THERE_ACK                       = 36137  //RFC 3706
+   IKE_NOTIFY_MSG_TYPE_ADDITIONAL_KEY_EXCHANGE             = 16441, //RFC 9370
+   IKE_NOTIFY_MSG_TYPE_USE_AGGFRAG                         = 16442, //RFC 9347
+   IKE_NOTIFY_MSG_TYPE_SUPPORTED_AUTH_METHODS              = 16443, //RFC 9593
+   IKE_NOTIFY_MSG_TYPE_SA_RESOURCE_INFO                    = 16444, //RFC 9611
+   IKE_NOTIFY_MSG_TYPE_USE_PPK_INT                         = 16445, //Draft
+   IKE_NOTIFY_MSG_TYPE_PPK_IDENTITY_KEY                    = 16446  //Draft
 } IkeNotifyMsgType;
 
 
@@ -1217,8 +1241,10 @@ typedef enum
 
 typedef enum
 {
-   IKE_TS_TYPE_IPV4_ADDR_RANGE = 7,
-   IKE_TS_TYPE_IPV6_ADDR_RANGE = 8
+   IKE_TS_TYPE_IPV4_ADDR_RANGE = 7, ///<TS_IPV4_ADDR_RANGE
+   IKE_TS_TYPE_IPV6_ADDR_RANGE = 8, ///<TS_IPV6_ADDR_RANGE
+   IKE_TS_TYPE_FC_ADDR_RANGE   = 9, ///<TS_FC_ADDR_RANGE
+   IKE_TS_TYPE_SECLABEL        = 10 ///<TS_SECLABEL
 } IkeTsType;
 
 
@@ -1254,26 +1280,33 @@ typedef enum
 
 typedef enum
 {
-   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_ADDRESS = 1,
-   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_NETMASK = 2,
-   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_DNS     = 3,
-   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_NBNS    = 4,
-   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_DHCP    = 6,
-   IKE_CONFIG_ATTR_TYPE_APPLICATION_VERSION  = 7,
-   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_ADDRESS = 8,
-   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_DNS     = 10,
-   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_DHCP    = 12,
-   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_SUBNET  = 13,
-   IKE_CONFIG_ATTR_TYPE_SUPPORTED_ATTRIBUTES = 14,
-   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_SUBNET  = 15,
-   IKE_CONFIG_ATTR_TYPE_MIP6_HOME_PREFIX     = 16,
-   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_LINK    = 17,
-   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_PREFIX  = 18,
-   IKE_CONFIG_ATTR_TYPE_P_CSCF_IP4_ADDRESS   = 20,
-   IKE_CONFIG_ATTR_TYPE_P_CSCF_IP6_ADDRESS   = 21,
-   IKE_CONFIG_ATTR_TYPE_INTERNAL_DNS_DOMAIN  = 25,
-   IKE_CONFIG_ATTR_TYPE_INTERNAL_DNSSEC_TA   = 26
-} IkeAttrType;
+   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_ADDRESS              = 1,
+   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_NETMASK              = 2,
+   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_DNS                  = 3,
+   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_NBNS                 = 4,
+   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_DHCP                 = 6,
+   IKE_CONFIG_ATTR_TYPE_APPLICATION_VERSION               = 7,
+   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_ADDRESS              = 8,
+   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_DNS                  = 10,
+   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_DHCP                 = 12,
+   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_SUBNET               = 13,
+   IKE_CONFIG_ATTR_TYPE_SUPPORTED_ATTRIBUTES              = 14,
+   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_SUBNET               = 15,
+   IKE_CONFIG_ATTR_TYPE_MIP6_HOME_PREFIX                  = 16,
+   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_LINK                 = 17,
+   IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_PREFIX               = 18,
+   IKE_CONFIG_ATTR_TYPE_HOME_AGENT_ADDRESS                = 19,
+   IKE_CONFIG_ATTR_TYPE_P_CSCF_IP4_ADDRESS                = 20,
+   IKE_CONFIG_ATTR_TYPE_P_CSCF_IP6_ADDRESS                = 21,
+   IKE_CONFIG_ATTR_TYPE_FTT_KAT                           = 22,
+   IKE_CONFIG_ATTR_TYPE_EXTERNAL_SOURCE_IP4_NAT_INFO      = 23,
+   IKE_CONFIG_ATTR_TYPE_TIMEOUT_PERIOD_FOR_LIVENESS_CHECK = 24,
+   IKE_CONFIG_ATTR_TYPE_INTERNAL_DNS_DOMAIN               = 25,
+   IKE_CONFIG_ATTR_TYPE_INTERNAL_DNSSEC_TA                = 26,
+   IKE_CONFIG_ATTR_TYPE_ENCDNS_IP4                        = 27,
+   IKE_CONFIG_ATTR_TYPE_ENCDNS_IP6                        = 28,
+   IKE_CONFIG_ATTR_TYPE_ENCDNS_DIGEST_INFO                = 29
+} IkeConfigAttrType;
 
 
 /**
