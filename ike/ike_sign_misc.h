@@ -89,11 +89,11 @@ error_t ikeSelectSignAlgo(const X509SignAlgoId *signAlgoId,
 const HashAlgo *ikeSelectSignHashAlgo(IkeSaEntry *sa,
    uint16_t preferredHashAlgoId);
 
-error_t ikeGetSignedOctets(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
-   uint8_t *macId, DataFrag *messageFrags, bool_t initiator);
+error_t ikeGetSignedOctets(IkeSaEntry *sa, const IkeId *id, uint8_t *macId,
+   DataFrag *messageFrags, bool_t initiator);
 
 error_t ikeDigestSignedOctets(IkeSaEntry *sa, const HashAlgo *hashAlgo,
-   const uint8_t *id, size_t idLen, uint8_t *digest, bool_t initiator);
+   const IkeId *id, uint8_t *digest, bool_t initiator);
 
 //C++ guard
 #ifdef __cplusplus

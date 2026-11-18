@@ -319,7 +319,7 @@ error_t ipsecClearSadEntry(IpsecContext *context, uint_t index)
    //Clear selector
    osMemset(&entry->selector, 0, sizeof(IpsecSelector));
    //Clear integrity protection key
-   osMemset(entry->authKey, 0, IPSEC_MAX_AUTH_KEY_LEN);
+   cryptoZeroizeMem(entry->authKey, IPSEC_MAX_AUTH_KEY_LEN);
 
 #if (ESP_SUPPORT == ENABLED)
    //Clear encryption parameters
@@ -330,7 +330,7 @@ error_t ipsecClearSadEntry(IpsecContext *context, uint_t index)
    entry->ivLen = 0;
 
    //Clear encryption key
-   osMemset(entry->encKey, 0, IPSEC_MAX_ENC_KEY_LEN);
+   cryptoZeroizeMem(entry->encKey, IPSEC_MAX_ENC_KEY_LEN);
 #endif
 
    //Mark the entry as closed
@@ -386,7 +386,7 @@ error_t ipsecClearPadEntry(IpsecContext *context, uint_t index)
       return ERROR_INVALID_PARAMETER;
 
    //Clear PAD entry
-   osMemset(&context->pad[index], 0, sizeof(IpsecPadEntry));
+   cryptoZeroizeMem(&context->pad[index], sizeof(IpsecPadEntry));
 
    //Sucessful processing
    return NO_ERROR;
@@ -416,7 +416,7 @@ void ipsecDeinit(IpsecContext *context)
       netUnlock(netContext);
 
       //Clear IPsec context
-      osMemset(context, 0, sizeof(IpsecContext));
+      cryptoZeroizeMem(context, sizeof(IpsecContext));
    }
 }
 

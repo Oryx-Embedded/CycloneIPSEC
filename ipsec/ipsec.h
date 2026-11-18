@@ -44,8 +44,11 @@ struct _IpsecContext;
 #include "core/net.h"
 #include "core/udp.h"
 #include "core/tcp.h"
+#include "ipv4/ipv4.h"
+#include "ipv4/ipv4_misc.h"
 #include "ipv4/icmp.h"
 #include "core/crypto.h"
+#include "core/crypto_mem.h"
 #include "ah/ah.h"
 #include "esp/esp.h"
 #include "cipher/cipher_algorithms.h"
@@ -177,15 +180,28 @@ typedef enum
 
 
 /**
+ * @brief Authentication protocols
+ **/
+
+typedef enum
+{
+   IPSEC_AUTH_PROTOCOL_INVALID = 0,
+   IPSEC_AUTH_PROTOCOL_IKEV1   = 1,
+   IPSEC_AUTH_PROTOCOL_IKEV2   = 2,
+   IPSEC_AUTH_PROTOCOL_KINK    = 3
+} IpsecAuthProtocol;
+
+
+/**
  * @brief Authentication methods
  **/
 
 typedef enum
 {
    IPSEC_AUTH_METHOD_INVALID = 0,
-   IPSEC_AUTH_METHOD_IKEV1   = 1,
-   IPSEC_AUTH_METHOD_IKEV2   = 2,
-   IPSEC_AUTH_METHOD_KINK    = 3
+   IPSEC_AUTH_METHOD_CERT    = 1,
+   IPSEC_AUTH_METHOD_PSK     = 2,
+   IPSEC_AUTH_METHOD_EAP     = 3
 } IpsecAuthMethod;
 
 
@@ -344,6 +360,19 @@ typedef union
 
 
 /**
+ * @brief Authentication data
+ **/
+
+typedef struct
+{
+   const char_t *trustedCaList;    ///<Trusted CA list (PEM format)
+   size_t trustedCaListLen;        ///<Total length of the trusted CA list
+   uint8_t psk[IPSEC_MAX_PSK_LEN]; ///<Pre-shared key
+   size_t pskLen;                  ///<Length of the pre-shared key, in bytes
+} IpsecAuthData;
+
+
+/**
  * @brief Security Policy Database (SPD) entry
  **/
 
@@ -410,14 +439,14 @@ struct _IpsecSadEntry
 
 typedef struct
 {
-   IpsecAuthMethod authMethod;     ///<Authentication method (IKEv1, IKEv2, KINK)
-   IpsecIdType idType;             ///<ID type
-   IpsecId id;                     ///<ID
-   size_t idLen;                   ///<Length of the ID, in bytes
-   uint8_t psk[IPSEC_MAX_PSK_LEN]; ///<Pre-shared key
-   size_t pskLen;                  ///<Length of the pre-shared key, in bytes
-   const char_t *trustedCaList;    ///Trusted CA list (PEM format)
-   size_t trustedCaListLen;        ///<Total length of the trusted CA list
+   IpsecIdType idType;                ///<ID type
+   IpsecId id;                        ///<ID
+   size_t idLen;                      ///<Length of the ID, in bytes
+   IpsecAuthProtocol authProtocol;    ///<Authentication protocol (IKEv1, IKEv2 or KINK)
+   IpsecAuthMethod authMethod;        ///<Authentication method (certificate or pre-shared secret)
+   IpsecAuthData authData;            ///<Authentication data
+   bool_t disableCertChainValidation; ///<Do not validate the peer's certificate chain against trusted CAs
+   bool_t disableCertValidityCheck;   ///<Do not check the validity period of the peer's certificate
 } IpsecPadEntry;
 
 

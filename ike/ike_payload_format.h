@@ -67,8 +67,8 @@ error_t ikeFormatCertPayload(const char_t *certChain, size_t certChainLen,
 error_t ikeFormatCertReqPayload(IkeSaEntry *sa, uint8_t *p, size_t *written,
    uint8_t **nextPayload);
 
-error_t ikeFormatAuthPayload(IkeSaEntry *sa, const IkeIdPayload *idPayload,
-   uint8_t *p, size_t *written, uint8_t **nextPayload);
+error_t ikeFormatAuthPayload(IkeSaEntry *sa, uint8_t *p, size_t *written,
+   uint8_t **nextPayload);
 
 error_t ikeFormatNoncePayload(IkeSaEntry *sa, IkeChildSaEntry *childSa,
    uint8_t *p, size_t *written, uint8_t **nextPayload);
@@ -97,6 +97,15 @@ error_t ikeFormatTsrPayload(IkeChildSaEntry *childSa, uint8_t *p,
 
 error_t ikeFormatTsEntry(const IkeTsEntry *tsEntry, uint8_t *p,
    size_t *written);
+
+error_t ikeFormatConfigPayload(IkeSaEntry *sa, uint8_t *p, size_t *written,
+   uint8_t **nextPayload);
+
+error_t ikeFormatConfigAttr(IkeConfigAttrType type, const void *value,
+   size_t length, uint8_t *p, size_t *written);
+
+error_t ikeFormatEapPayload(IkeSaEntry *sa, uint8_t *p, size_t *written,
+   uint8_t **nextPayload);
 
 //C++ guard
 #ifdef __cplusplus

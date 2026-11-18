@@ -46,16 +46,14 @@
 /**
  * @brief Signature generation
  * @param[in] sa Pointer to the IKE SA
- * @param[in] id Pointer to the identification data
- * @param[in] idLen Length of the identification data, in bytes
  * @param[out] authMethod Authentication method
  * @param[out] signature Output stream where to write the signature
  * @param[out] signatureLen Total number of bytes that have been written
  * @return Error code
  **/
 
-error_t ikeGenerateSignature(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
-   uint8_t *authMethod, uint8_t *signature, size_t *signatureLen)
+error_t ikeGenerateSignature(IkeSaEntry *sa, uint8_t *authMethod,
+   uint8_t *signature, size_t *signatureLen)
 {
    error_t error;
    IkeContext *context;
@@ -75,8 +73,8 @@ error_t ikeGenerateSignature(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
       //The new digital signature method is flexible enough to include all
       //current signature methods (RSA, RSA-PSS, DSA, ECDSA and EdDSA) and add
       //new methods in the future
-      error = ikeGenerateDigitalSignature(sa, id, idLen,
-         (IkeAuthData *) signature, signatureLen);
+      error = ikeGenerateDigitalSignature(sa, (IkeAuthData *) signature,
+         signatureLen);
    }
    else
 #endif
@@ -88,7 +86,7 @@ error_t ikeGenerateSignature(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
       *authMethod = IKE_AUTH_METHOD_RSA;
 
       //Generate an RSA signature using the entity's private key
-      error = ikeGenerateRsaSignature(sa, id, idLen, SHA1_HASH_ALGO, signature,
+      error = ikeGenerateRsaSignature(sa, SHA1_HASH_ALGO, signature,
          signatureLen);
    }
    else
@@ -101,7 +99,7 @@ error_t ikeGenerateSignature(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
       *authMethod = IKE_AUTH_METHOD_DSS;
 
       //Generate an DSA signature using the entity's private key
-      error = ikeGenerateDsaSignature(sa, id, idLen, SHA1_HASH_ALGO, signature,
+      error = ikeGenerateDsaSignature(sa, SHA1_HASH_ALGO, signature,
          signatureLen, IKE_SIGN_FORMAT_RAW);
    }
    else
@@ -115,8 +113,8 @@ error_t ikeGenerateSignature(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
       *authMethod = IKE_AUTH_METHOD_ECDSA_P256_SHA256;
 
       //Generate an ECDSA signature using the entity's private key
-      error = ikeGenerateEcdsaSignature(sa, id, idLen, SECP256R1_CURVE,
-         SHA256_HASH_ALGO, signature, signatureLen, IKE_SIGN_FORMAT_RAW);
+      error = ikeGenerateEcdsaSignature(sa, SECP256R1_CURVE, SHA256_HASH_ALGO,
+         signature, signatureLen, IKE_SIGN_FORMAT_RAW);
    }
    else
 #endif
@@ -129,8 +127,8 @@ error_t ikeGenerateSignature(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
       *authMethod = IKE_AUTH_METHOD_ECDSA_P384_SHA384;
 
       //Generate an ECDSA signature using the entity's private key
-      error = ikeGenerateEcdsaSignature(sa, id, idLen, SECP384R1_CURVE,
-         SHA384_HASH_ALGO, signature, signatureLen, IKE_SIGN_FORMAT_RAW);
+      error = ikeGenerateEcdsaSignature(sa, SECP384R1_CURVE, SHA384_HASH_ALGO,
+         signature, signatureLen, IKE_SIGN_FORMAT_RAW);
    }
    else
 #endif
@@ -143,8 +141,8 @@ error_t ikeGenerateSignature(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
       *authMethod = IKE_AUTH_METHOD_ECDSA_P521_SHA512;
 
       //Generate an ECDSA signature using the entity's private key
-      error = ikeGenerateEcdsaSignature(sa, id, idLen, SECP521R1_CURVE,
-         SHA512_HASH_ALGO, signature, signatureLen, IKE_SIGN_FORMAT_RAW);
+      error = ikeGenerateEcdsaSignature(sa, SECP521R1_CURVE, SHA512_HASH_ALGO,
+         signature, signatureLen, IKE_SIGN_FORMAT_RAW);
    }
    else
 #endif
@@ -162,15 +160,13 @@ error_t ikeGenerateSignature(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
 /**
  * @brief Digital signature generation
  * @param[in] sa Pointer to the IKE SA
- * @param[in] id Pointer to the identification data
- * @param[in] idLen Length of the identification data, in bytes
  * @param[out] authData Output stream where to write the authentication data
  * @param[out] authDataLen Total number of bytes that have been written
  * @return Error code
  **/
 
-error_t ikeGenerateDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, IkeAuthData *authData, size_t *authDataLen)
+error_t ikeGenerateDigitalSignature(IkeSaEntry *sa, IkeAuthData *authData,
+   size_t *authDataLen)
 {
    error_t error;
    size_t n;
@@ -236,8 +232,7 @@ error_t ikeGenerateDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
       if(context->certType == IKE_CERT_TYPE_RSA)
       {
          //Generate an RSA signature using the entity's private key
-         error = ikeGenerateRsaSignature(sa, id, idLen, hashAlgo, signature,
-            &n);
+         error = ikeGenerateRsaSignature(sa, hashAlgo, signature, &n);
       }
       else
 #endif
@@ -246,7 +241,7 @@ error_t ikeGenerateDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
       if(context->certType == IKE_CERT_TYPE_RSA_PSS)
       {
          //Generate an RSA-PSS signature using the entity's private key
-         error = ikeGenerateRsaPssSignature(sa, id, idLen, hashAlgo,
+         error = ikeGenerateRsaPssSignature(sa, hashAlgo,
             signAlgoId.rsaPssParams.saltLen, signature, &n);
       }
       else
@@ -256,8 +251,8 @@ error_t ikeGenerateDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
       if(context->certType == IKE_CERT_TYPE_DSA)
       {
          //Generate an DSA signature using the entity's private key
-         error = ikeGenerateDsaSignature(sa, id, idLen, hashAlgo, signature,
-            &n, IKE_SIGN_FORMAT_ASN1);
+         error = ikeGenerateDsaSignature(sa, hashAlgo, signature, &n,
+            IKE_SIGN_FORMAT_ASN1);
       }
       else
 #endif
@@ -266,8 +261,8 @@ error_t ikeGenerateDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
       if(context->certType == IKE_CERT_TYPE_ECDSA_P256)
       {
          //Generate an ECDSA signature using the entity's private key
-         error = ikeGenerateEcdsaSignature(sa, id, idLen, SECP256R1_CURVE,
-            hashAlgo, signature, &n, IKE_SIGN_FORMAT_ASN1);
+         error = ikeGenerateEcdsaSignature(sa, SECP256R1_CURVE, hashAlgo,
+            signature, &n, IKE_SIGN_FORMAT_ASN1);
       }
       else
 #endif
@@ -276,8 +271,8 @@ error_t ikeGenerateDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
       if(context->certType == IKE_CERT_TYPE_ECDSA_P384)
       {
          //Generate an ECDSA signature using the entity's private key
-         error = ikeGenerateEcdsaSignature(sa, id, idLen, SECP384R1_CURVE,
-            hashAlgo, signature, &n, IKE_SIGN_FORMAT_ASN1);
+         error = ikeGenerateEcdsaSignature(sa, SECP384R1_CURVE, hashAlgo,
+            signature, &n, IKE_SIGN_FORMAT_ASN1);
       }
       else
 #endif
@@ -286,8 +281,8 @@ error_t ikeGenerateDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
       if(context->certType == IKE_CERT_TYPE_ECDSA_P521)
       {
          //Generate an ECDSA signature using the entity's private key
-         error = ikeGenerateEcdsaSignature(sa, id, idLen, SECP521R1_CURVE,
-            hashAlgo, signature, &n, IKE_SIGN_FORMAT_ASN1);
+         error = ikeGenerateEcdsaSignature(sa, SECP521R1_CURVE, hashAlgo,
+            signature, &n, IKE_SIGN_FORMAT_ASN1);
       }
       else
 #endif
@@ -296,7 +291,7 @@ error_t ikeGenerateDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
       if(context->certType == IKE_CERT_TYPE_ED25519)
       {
          //Generate an Ed25519 signature using the entity's private key
-         error = ikeGenerateEd25519Signature(sa, id, idLen, signature, &n);
+         error = ikeGenerateEd25519Signature(sa, signature, &n);
       }
       else
 #endif
@@ -305,7 +300,7 @@ error_t ikeGenerateDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
       if(context->certType == IKE_CERT_TYPE_ED448)
       {
          //Generate an Ed448 signature using the entity's private key
-         error = ikeGenerateEd448Signature(sa, id, idLen, signature, &n);
+         error = ikeGenerateEd448Signature(sa, signature, &n);
       }
       else
 #endif
@@ -331,17 +326,14 @@ error_t ikeGenerateDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
 /**
  * @brief RSA signature generation
  * @param[in] sa Pointer to the IKE SA
- * @param[in] id Pointer to the identification data
- * @param[in] idLen Length of the identification data, in bytes
  * @param[in] hashAlgo Hash algorithm
  * @param[out] signature Output stream where to write the signature
  * @param[out] signatureLen Total number of bytes that have been written
  * @return Error code
  **/
 
-error_t ikeGenerateRsaSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const HashAlgo *hashAlgo, uint8_t *signature,
-   size_t *signatureLen)
+error_t ikeGenerateRsaSignature(IkeSaEntry *sa, const HashAlgo *hashAlgo,
+   uint8_t *signature, size_t *signatureLen)
 {
 #if (IKE_RSA_SIGN_SUPPORT == ENABLED)
    error_t error;
@@ -356,7 +348,7 @@ error_t ikeGenerateRsaSignature(IkeSaEntry *sa, const uint8_t *id,
    rsaInitPrivateKey(&rsaPrivateKey);
 
    //Digest signed octets
-   error = ikeDigestSignedOctets(sa, hashAlgo, id, idLen, digest,
+   error = ikeDigestSignedOctets(sa, hashAlgo, &context->id, digest,
       sa->originalInitiator);
 
    //Check status code
@@ -364,7 +356,7 @@ error_t ikeGenerateRsaSignature(IkeSaEntry *sa, const uint8_t *id,
    {
       //Import RSA private key
       error = pemImportRsaPrivateKey(&rsaPrivateKey, context->privateKey,
-         context->privateKeyLen, context->password);
+         context->privateKeyLen, context->privateKeyPassword);
    }
 
    //Check status code
@@ -390,8 +382,6 @@ error_t ikeGenerateRsaSignature(IkeSaEntry *sa, const uint8_t *id,
 /**
  * @brief RSA-PSS signature generation
  * @param[in] sa Pointer to the IKE SA
- * @param[in] id Pointer to the identification data
- * @param[in] idLen Length of the identification data, in bytes
  * @param[in] hashAlgo Hash algorithm
  * @param[in] saltLen Length of the salt, in bytes
  * @param[out] signature Output stream where to write the signature
@@ -399,9 +389,8 @@ error_t ikeGenerateRsaSignature(IkeSaEntry *sa, const uint8_t *id,
  * @return Error code
  **/
 
-error_t ikeGenerateRsaPssSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const HashAlgo *hashAlgo, size_t saltLen, uint8_t *signature,
-   size_t *signatureLen)
+error_t ikeGenerateRsaPssSignature(IkeSaEntry *sa, const HashAlgo *hashAlgo,
+   size_t saltLen, uint8_t *signature, size_t *signatureLen)
 {
 #if (IKE_RSA_PSS_SIGN_SUPPORT == ENABLED)
    error_t error;
@@ -416,7 +405,7 @@ error_t ikeGenerateRsaPssSignature(IkeSaEntry *sa, const uint8_t *id,
    rsaInitPrivateKey(&rsaPrivateKey);
 
    //Digest signed octets
-   error = ikeDigestSignedOctets(sa, hashAlgo, id, idLen, digest,
+   error = ikeDigestSignedOctets(sa, hashAlgo, &context->id, digest,
       sa->originalInitiator);
 
    //Check status code
@@ -424,7 +413,7 @@ error_t ikeGenerateRsaPssSignature(IkeSaEntry *sa, const uint8_t *id,
    {
       //Import RSA private key
       error = pemImportRsaPrivateKey(&rsaPrivateKey, context->privateKey,
-         context->privateKeyLen, context->password);
+         context->privateKeyLen, context->privateKeyPassword);
    }
 
    //Check status code
@@ -451,8 +440,6 @@ error_t ikeGenerateRsaPssSignature(IkeSaEntry *sa, const uint8_t *id,
 /**
  * @brief DSA signature generation
  * @param[in] sa Pointer to the IKE SA
- * @param[in] id Pointer to the identification data
- * @param[in] idLen Length of the identification data, in bytes
  * @param[in] hashAlgo Hash algorithm
  * @param[out] signature Output stream where to write the signature
  * @param[out] signatureLen Total number of bytes that have been written
@@ -460,9 +447,8 @@ error_t ikeGenerateRsaPssSignature(IkeSaEntry *sa, const uint8_t *id,
  * @return Error code
  **/
 
-error_t ikeGenerateDsaSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const HashAlgo *hashAlgo, uint8_t *signature,
-   size_t *signatureLen, IkeSignFormat format)
+error_t ikeGenerateDsaSignature(IkeSaEntry *sa, const HashAlgo *hashAlgo,
+   uint8_t *signature, size_t *signatureLen, IkeSignFormat format)
 {
 #if (IKE_DSA_SIGN_SUPPORT == ENABLED)
    error_t error;
@@ -480,7 +466,7 @@ error_t ikeGenerateDsaSignature(IkeSaEntry *sa, const uint8_t *id,
    dsaInitSignature(&dsaSignature);
 
    //Digest signed octets
-   error = ikeDigestSignedOctets(sa, hashAlgo, id, idLen, digest,
+   error = ikeDigestSignedOctets(sa, hashAlgo, &context->id, digest,
       sa->originalInitiator);
 
    //Check status code
@@ -488,7 +474,7 @@ error_t ikeGenerateDsaSignature(IkeSaEntry *sa, const uint8_t *id,
    {
       //Import DSA private key
       error = pemImportDsaPrivateKey(&dsaPrivateKey, context->privateKey,
-         context->privateKeyLen, context->password);
+         context->privateKeyLen, context->privateKeyPassword);
    }
 
    //Check status code
@@ -523,8 +509,6 @@ error_t ikeGenerateDsaSignature(IkeSaEntry *sa, const uint8_t *id,
 /**
  * @brief ECDSA signature generation
  * @param[in] sa Pointer to the IKE SA
- * @param[in] id Pointer to the identification data
- * @param[in] idLen Length of the identification data, in bytes
  * @param[in] group Elliptic curve group
  * @param[in] hashAlgo Hash algorithm
  * @param[out] signature Output stream where to write the signature
@@ -533,9 +517,9 @@ error_t ikeGenerateDsaSignature(IkeSaEntry *sa, const uint8_t *id,
  * @return Error code
  **/
 
-error_t ikeGenerateEcdsaSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const EcCurve *group, const HashAlgo *hashAlgo,
-   uint8_t *signature, size_t *signatureLen, IkeSignFormat format)
+error_t ikeGenerateEcdsaSignature(IkeSaEntry *sa, const EcCurve *group,
+   const HashAlgo *hashAlgo, uint8_t *signature, size_t *signatureLen,
+   IkeSignFormat format)
 {
 #if (IKE_ECDSA_SIGN_SUPPORT == ENABLED)
    error_t error;
@@ -553,7 +537,7 @@ error_t ikeGenerateEcdsaSignature(IkeSaEntry *sa, const uint8_t *id,
    ecdsaInitSignature(&ecdsaSignature);
 
    //Digest signed octets
-   error = ikeDigestSignedOctets(sa, hashAlgo, id, idLen, digest,
+   error = ikeDigestSignedOctets(sa, hashAlgo, &context->id, digest,
       sa->originalInitiator);
 
    //Check status code
@@ -561,7 +545,7 @@ error_t ikeGenerateEcdsaSignature(IkeSaEntry *sa, const uint8_t *id,
    {
       //Import EC private key
       error = pemImportEcPrivateKey(&ecPrivateKey, context->privateKey,
-         context->privateKeyLen, context->password);
+         context->privateKeyLen, context->privateKeyPassword);
    }
 
    //Check status code
@@ -596,15 +580,13 @@ error_t ikeGenerateEcdsaSignature(IkeSaEntry *sa, const uint8_t *id,
 /**
  * @brief Ed25519 signature generation
  * @param[in] sa Pointer to the IKE SA
- * @param[in] id Pointer to the identification data
- * @param[in] idLen Length of the identification data, in bytes
  * @param[out] signature Output stream where to write the signature
  * @param[out] signatureLen Total number of bytes that have been written
  * @return Error code
  **/
 
-error_t ikeGenerateEd25519Signature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, uint8_t *signature, size_t *signatureLen)
+error_t ikeGenerateEd25519Signature(IkeSaEntry *sa, uint8_t *signature,
+   size_t *signatureLen)
 {
 #if (IKE_ED25519_SIGN_SUPPORT == ENABLED)
    error_t error;
@@ -621,7 +603,7 @@ error_t ikeGenerateEd25519Signature(IkeSaEntry *sa, const uint8_t *id,
    eddsaInitPrivateKey(&ed25519PrivateKey);
 
    //Data to be signed is run through the EdDSA algorithm without pre-hashing
-   error = ikeGetSignedOctets(sa, id, idLen, macId, messageFrags,
+   error = ikeGetSignedOctets(sa, &context->id, macId, messageFrags,
       sa->originalInitiator);
 
    //Check status code
@@ -629,7 +611,7 @@ error_t ikeGenerateEd25519Signature(IkeSaEntry *sa, const uint8_t *id,
    {
       //Import Ed25519 private key
       error = pemImportEddsaPrivateKey(&ed25519PrivateKey, context->privateKey,
-         context->privateKeyLen, context->password);
+         context->privateKeyLen, context->privateKeyPassword);
    }
 
    //Check status code
@@ -665,15 +647,13 @@ error_t ikeGenerateEd25519Signature(IkeSaEntry *sa, const uint8_t *id,
 /**
  * @brief Ed448 signature generation
  * @param[in] sa Pointer to the IKE SA
- * @param[in] id Pointer to the identification data
- * @param[in] idLen Length of the identification data, in bytes
  * @param[out] signature Output stream where to write the signature
  * @param[out] signatureLen Total number of bytes that have been written
  * @return Error code
  **/
 
-error_t ikeGenerateEd448Signature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, uint8_t *signature, size_t *signatureLen)
+error_t ikeGenerateEd448Signature(IkeSaEntry *sa, uint8_t *signature,
+   size_t *signatureLen)
 {
 #if (IKE_ED448_SIGN_SUPPORT == ENABLED)
    error_t error;
@@ -690,7 +670,7 @@ error_t ikeGenerateEd448Signature(IkeSaEntry *sa, const uint8_t *id,
    eddsaInitPrivateKey(&ed448PrivateKey);
 
    //Data to be signed is run through the EdDSA algorithm without pre-hashing
-   error = ikeGetSignedOctets(sa, id, idLen, macId, messageFrags,
+   error = ikeGetSignedOctets(sa, &context->id, macId, messageFrags,
       sa->originalInitiator);
 
    //Check status code
@@ -698,7 +678,7 @@ error_t ikeGenerateEd448Signature(IkeSaEntry *sa, const uint8_t *id,
    {
       //Import Ed448 private key
       error = pemImportEddsaPrivateKey(&ed448PrivateKey, context->privateKey,
-         context->privateKeyLen, context->password);
+         context->privateKeyLen, context->privateKeyPassword);
    }
 
    //Check status code

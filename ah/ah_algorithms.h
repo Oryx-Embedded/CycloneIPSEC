@@ -49,13 +49,13 @@ error_t ahAddSupportedTransforms(IkeChildSaEntry *childSa,
 error_t ahAddSupportedAuthTransforms(IkeChildSaEntry *childSa,
    IkeProposal *proposal, uint8_t **lastSubstruc);
 
-error_t ahAddSupportedEsnTransforms(IkeChildSaEntry *childSa,
+error_t ahAddSupportedSnTransforms(IkeChildSaEntry *childSa,
    IkeProposal *proposal, uint8_t **lastSubstruc);
 
 uint16_t ahSelectAuthTransform(IkeChildSaEntry *childSa,
    const IkeProposal *proposal, size_t proposalLen);
 
-uint16_t ahSelectEsnTransform(IkeChildSaEntry *childSa,
+uint16_t ahSelectSnTransform(IkeChildSaEntry *childSa,
    const IkeProposal *proposal, size_t proposalLen);
 
 error_t ahSelectSaProposal(IkeChildSaEntry *childSa,

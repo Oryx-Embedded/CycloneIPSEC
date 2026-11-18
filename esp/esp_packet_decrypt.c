@@ -61,12 +61,11 @@ error_t espDecryptPacket(IpsecContext *context, IpsecSadEntry *sa,
    uint8_t *nextHeader)
 {
    error_t error;
-   size_t i;
    uint8_t *data;
    uint8_t *icv;
    size_t length;
+   size_t padLen;
    const CipherAlgo *cipherAlgo;
-   EspTrailer *espTrailer;
    uint8_t iv[MAX_CIPHER_BLOCK_SIZE];
 
    //Check the length of the payload data
@@ -89,6 +88,9 @@ error_t espDecryptPacket(IpsecContext *context, IpsecSadEntry *sa,
    //decryption (refer to RFC 4303, section 3.4.2)
    cipherAlgo = sa->cipherAlgo;
 
+   //Initialize status code
+   error = NO_ERROR;
+
 #if (ESP_NULL_SUPPORT == ENABLED)
    //Integrity-only ESP?
    if(sa->cipherMode == CIPHER_MODE_NULL)
@@ -96,9 +98,6 @@ error_t espDecryptPacket(IpsecContext *context, IpsecSadEntry *sa,
       //No confidentiality is offered by using the NULL encryption algorithm
       error = espVerifyChecksum(context, sa, espHeader, context->buffer, length,
          icv);
-      //Any error to report?
-      if(error)
-         return error;
    }
    else
 #endif
@@ -106,30 +105,38 @@ error_t espDecryptPacket(IpsecContext *context, IpsecSadEntry *sa,
    //CBC cipher mode?
    if(sa->cipherMode == CIPHER_MODE_CBC)
    {
-      //The length of the ciphertext must be a multiple of the block size
-      if((length % cipherAlgo->blockSize) != 0)
-         return ERROR_INVALID_PACKET;
+      //Check the length of the ciphertext
+      if((length % cipherAlgo->blockSize) == 0)
+      {
+         //If a separate integrity algorithm is employed, then the receiver
+         //proceeds to integrity verification (refer to RFC 4303, section 3.4.3)
+         error = espVerifyChecksum(context, sa, espHeader, context->buffer,
+            sa->ivLen + length, icv);
 
-      //If a separate integrity algorithm is employed, then the receiver
-      //proceeds to integrity verification (refer to RFC 4303, section 3.4.3)
-      error = espVerifyChecksum(context, sa, espHeader, context->buffer,
-         sa->ivLen + length, icv);
-      //Any error to report?
-      if(error)
-         return error;
+         //Check status code
+         if(!error)
+         {
+            //Initialize cipher context
+            error = cipherAlgo->init(&sa->cipherContext, sa->encKey,
+               sa->encKeyLen);
 
-      //Initialize cipher context
-      error = cipherAlgo->init(&sa->cipherContext, sa->encKey, sa->encKeyLen);
-      //Any error to report?
-      if(error)
-         return error;
+            //Check status code
+            if(!error)
+            {
+               //Perform CBC decryption
+               error = cbcDecrypt(cipherAlgo, &sa->cipherContext, iv, data,
+                  payload, length);
 
-      //Perform CBC decryption
-      error = cbcDecrypt(cipherAlgo, &sa->cipherContext, iv, data, payload,
-         length);
-      //Any error to report?
-      if(error)
-         return error;
+               //Erase cipher context
+               cipherAlgo->deinit(&sa->cipherContext);
+            }
+         }
+      }
+      else
+      {
+         //The length of the ciphertext must be a multiple of the block size
+         error = ERROR_INVALID_PACKET;
+      }
    }
    else
 #endif
@@ -144,30 +151,33 @@ error_t espDecryptPacket(IpsecContext *context, IpsecSadEntry *sa,
       osMemcpy(counter, sa->encKey + sa->encKeyLen, 4);
       osMemcpy(counter + 4, iv, 8);
 
-      //The block counter begins with the value of one and increments by one
-      //to generate the next portion of the key stream
+      //The block counter begins with the value of one and increments by one to
+      //generate the next portion of the key stream
       STORE32BE(1, counter + 12);
 
       //If a separate integrity algorithm is employed, then the receiver
       //proceeds to integrity verification (refer to RFC 4303, section 3.4.3)
       error = espVerifyChecksum(context, sa, espHeader, context->buffer,
          sa->ivLen + length, icv);
-      //Any error to report?
-      if(error)
-         return error;
 
-      //Initialize cipher context
-      error = cipherAlgo->init(&sa->cipherContext, sa->encKey, sa->encKeyLen);
-      //Any error to report?
-      if(error)
-         return error;
+      //Check status code
+      if(!error)
+      {
+         //Initialize cipher context
+         error = cipherAlgo->init(&sa->cipherContext, sa->encKey,
+            sa->encKeyLen);
 
-      //Perform CTR decryption
-      error = ctrDecrypt(cipherAlgo, &sa->cipherContext,
-         cipherAlgo->blockSize * 8, counter, data, payload, length);
-      //Any error to report?
-      if(error)
-         return error;
+         //Check status code
+         if(!error)
+         {
+            //Perform CTR decryption
+            error = ctrDecrypt(cipherAlgo, &sa->cipherContext,
+               cipherAlgo->blockSize * 8, counter, data, payload, length);
+
+            //Erase cipher context
+            cipherAlgo->deinit(&sa->cipherContext);
+         }
+      }
    }
    else
 #endif
@@ -205,16 +215,17 @@ error_t espDecryptPacket(IpsecContext *context, IpsecSadEntry *sa,
 
       //Initialize cipher context
       error = cipherAlgo->init(&sa->cipherContext, sa->encKey, sa->encKeyLen);
-      //Any error to report?
-      if(error)
-         return error;
 
-      //Authenticated decryption using CCM
-      error = ccmDecrypt(sa->cipherAlgo, &sa->cipherContext, nonce, 11, aad,
-         aadLen, data, payload, length, icv, sa->icvLen);
-      //Any error to report?
-      if(error)
-         return error;
+      //Check status code
+      if(!error)
+      {
+         //Authenticated decryption using CCM
+         error = ccmDecrypt(sa->cipherAlgo, &sa->cipherContext, nonce, 11,
+            aad, aadLen, data, payload, length, icv, sa->icvLen);
+
+         //Erase cipher context
+         cipherAlgo->deinit(&sa->cipherContext);
+      }
    }
    else
 #endif
@@ -253,22 +264,27 @@ error_t espDecryptPacket(IpsecContext *context, IpsecSadEntry *sa,
 
       //Initialize cipher context
       error = cipherAlgo->init(&sa->cipherContext, sa->encKey, sa->encKeyLen);
-      //Any error to report?
-      if(error)
-         return error;
 
-      //Initialize GCM context
-      error = gcmInit(&gcmContext, sa->cipherAlgo, &sa->cipherContext);
-      //Any error to report?
-      if(error)
-         return error;
+      //Check status code
+      if(!error)
+      {
+         //Initialize GCM context
+         error = gcmInit(&gcmContext, sa->cipherAlgo, &sa->cipherContext);
 
-      //Authenticated decryption using GCM
-      error = gcmDecrypt(&gcmContext, nonce, 12, aad, aadLen, data, payload,
-         length, icv, sa->icvLen);
-      //Any error to report?
-      if(error)
-         return error;
+         //Check status code
+         if(!error)
+         {
+            //Authenticated decryption using GCM
+            error = gcmDecrypt(&gcmContext, nonce, 12, aad, aadLen, data,
+               payload, length, icv, sa->icvLen);
+
+            //Erase GCM context
+            gcmDeinit(&gcmContext);
+         }
+
+         //Erase cipher context
+         cipherAlgo->deinit(&sa->cipherContext);
+      }
    }
    else
 #endif
@@ -317,8 +333,6 @@ error_t espDecryptPacket(IpsecContext *context, IpsecSadEntry *sa,
    //GMAC authentication algorithm?
    if(sa->cipherMode == CIPHER_MODE_GMAC)
    {
-      size_t i;
-      uint8_t mask;
       uint8_t temp[16];
       uint8_t nonce[12];
       GmacContext gmacContext;
@@ -330,93 +344,93 @@ error_t espDecryptPacket(IpsecContext *context, IpsecSadEntry *sa,
 
       //Initialize GMAC context
       error = gmacInit(&gmacContext, sa->cipherAlgo, sa->encKey, sa->encKeyLen);
-      //Any error to report?
-      if(error)
-         return error;
 
-      //The nonce is passed to the AES-GMAC authentication algorithm
-      error = gmacReset(&gmacContext, nonce, 12);
-      //Any error to report?
-      if(error)
-         return error;
-
-      //Two formats of the AAD are defined (refer to RFC 4543, section 3.3)
-      if(sa->esn)
+      //Check status code
+      if(!error)
       {
-         //Reconstruct the 64-bit sequence number
-         uint64_t seq = ipsecGetSeqNum(sa, ntohl(espHeader->seqNum));
+         //The nonce is passed to the AES-GMAC authentication algorithm
+         error = gmacReset(&gmacContext, nonce, 12);
 
-         //Convert the 64-bit sequence number to network byte order
-         STORE64BE(seq, temp);
+         //Check status code
+         if(!error)
+         {
+            //Two formats of the AAD are defined (refer to RFC 4543,
+            //section 3.3)
+            if(sa->esn)
+            {
+               //Reconstruct the 64-bit sequence number
+               uint64_t seq = ipsecGetSeqNum(sa, ntohl(espHeader->seqNum));
 
-         //The AAD consists of the SPI, 64-bit sequence number, and ESP payload
-         gmacUpdate(&gmacContext, (uint8_t *) &espHeader->spi, 4);
-         gmacUpdate(&gmacContext, temp, 8);
-         gmacUpdate(&gmacContext, iv, 8);
-         gmacUpdate(&gmacContext, data, length);
+               //Convert the 64-bit sequence number to network byte order
+               STORE64BE(seq, temp);
+
+               //The AAD consists of the SPI, 64-bit sequence number, and ESP
+               //payload
+               gmacUpdate(&gmacContext, (uint8_t *) &espHeader->spi, 4);
+               gmacUpdate(&gmacContext, temp, 8);
+               gmacUpdate(&gmacContext, iv, 8);
+               gmacUpdate(&gmacContext, data, length);
+            }
+            else
+            {
+               //The AAD consists of the SPI, 32-bit sequence number, and ESP
+               //payload
+               gmacUpdate(&gmacContext, espHeader, sizeof(EspHeader));
+               gmacUpdate(&gmacContext, iv, 8);
+               gmacUpdate(&gmacContext, data, length);
+            }
+
+            //Finalize GMAC computation
+            error = gmacFinal(&gmacContext, temp, sa->icvLen);
+         }
+
+         //Erase GMAC context
+         gmacDeinit(&gmacContext);
       }
-      else
+
+      //Check status code
+      if(!error)
       {
-         //The AAD consists of the SPI, 32-bit sequence number, and ESP payload
-         gmacUpdate(&gmacContext, espHeader, sizeof(EspHeader));
-         gmacUpdate(&gmacContext, iv, 8);
-         gmacUpdate(&gmacContext, data, length);
+         //If the computed and received ICVs match, then the datagram is valid,
+         //and it is accepted (refer to RFC 4303, section 3.4.4.1)
+         if(cryptoCompMem(temp, icv, sa->icvLen) != 0)
+         {
+            error = ERROR_DECRYPTION_FAILED;
+         }
       }
 
-      //Finalize GMAC computation
-      error = gmacFinal(&gmacContext, temp, sa->icvLen);
-      //Any error to report?
-      if(error)
-         return error;
-
-      //The computed ICV is bitwise compared to the received ICV
-      for(mask = 0, i = 0; i < sa->icvLen; i++)
+      //Check status code
+      if(!error)
       {
-         mask |= temp[i] ^ icv[i];
+         //Copy payload data
+         osMemcpy(payload, data, length);
       }
-
-      //If the computed and received ICVs match, then the datagram is valid,
-      //and it is accepted (refer to RFC 4303, section 3.4.4.1)
-      if(mask != 0)
-         return ERROR_DECRYPTION_FAILED;
-
-      //Copy payload data
-      osMemcpy(payload, data, length);
    }
    else
 #endif
    //Invalid cipher mode?
    {
       //The specified cipher mode is not supported
-      return ERROR_UNSUPPORTED_CIPHER_MODE;
+      error = ERROR_UNSUPPORTED_CIPHER_MODE;
    }
 
-   //Point to the ESP trailer
-   length -= sizeof(EspTrailer);
-   espTrailer = (EspTrailer *) (payload + length);
-
-   //The Pad Length field is the length of the Padding field
-   if(espTrailer->padLength > length)
-      return ERROR_DECRYPTION_FAILED;
-
-   //The receiver should inspect the Padding field (refer to RFC 4303,
-   //section 2.4)
-   for(i = 0; i < espTrailer->padLength; i++)
+   //Check status code
+   if(!error)
    {
-      //Padding bytes make up a monotonically increasing sequence
-      if(payload[length - espTrailer->padLength + i] != (i + 1))
-         return ERROR_DECRYPTION_FAILED;
+      //Parse ESP trailer
+      error = espParseTrailer(payload, length, &padLen, nextHeader);
    }
 
-   //Remove the padding prior to passing the decrypted data to the next layer
-   *payloadLen = length - espTrailer->padLength;
+   //Check status code
+   if(!error)
+   {
+      //Remove the padding and the ESP trailer prior to passing the decrypted
+      //data to the next layer
+      *payloadLen = length - padLen - sizeof(EspTrailer);
+   }
 
-   //The Next Header field identifies the type of data contained in the
-   //payload data (refer to RFC 4303, section 2.6)
-   *nextHeader = espTrailer->nextHeader;
-
-   //Successful processing
-   return NO_ERROR;
+   //Return status code
+   return error;
 }
 
 
@@ -436,8 +450,6 @@ error_t espVerifyChecksum(IpsecContext *context, IpsecSadEntry *sa,
    const uint8_t *icv)
 {
    error_t error;
-   size_t i;
-   uint8_t mask;
    uint8_t checksum[ESP_MAX_DIGEST_SIZE];
 
 #if (ESP_CMAC_SUPPORT == ENABLED)
@@ -462,7 +474,7 @@ error_t espVerifyChecksum(IpsecContext *context, IpsecSadEntry *sa,
          cmacUpdate(cmacContext, espHeader, sizeof(EspHeader));
          cmacUpdate(cmacContext, payload, length);
 
-         //Extended sequence number?
+         //Extended sequence numbers?
          if(sa->esn)
          {
             //Determine the higher-order bits of the sequence number
@@ -478,7 +490,10 @@ error_t espVerifyChecksum(IpsecContext *context, IpsecSadEntry *sa,
          }
 
          //Finalize CMAC computation
-         cmacFinal(cmacContext, checksum, sa->icvLen);
+         error = cmacFinal(cmacContext, checksum, sa->icvLen);
+
+         //Erase CMAC context
+         cmacDeinit(cmacContext);
       }
    }
    else
@@ -505,7 +520,7 @@ error_t espVerifyChecksum(IpsecContext *context, IpsecSadEntry *sa,
          hmacUpdate(hmacContext, espHeader, sizeof(EspHeader));
          hmacUpdate(hmacContext, payload, length);
 
-         //Extended sequence number?
+         //Extended sequence numbers?
          if(sa->esn)
          {
             //Determine the higher-order bits of the sequence number
@@ -522,6 +537,9 @@ error_t espVerifyChecksum(IpsecContext *context, IpsecSadEntry *sa,
 
          //Finalize HMAC computation
          hmacFinal(hmacContext, checksum);
+
+         //Erase HMAC context
+         hmacDeinit(hmacContext);
       }
    }
    else
@@ -535,19 +553,64 @@ error_t espVerifyChecksum(IpsecContext *context, IpsecSadEntry *sa,
    //Check status code
    if(!error)
    {
-      //The computed ICV is bitwise compared to the received ICV
-      for(mask = 0, i = 0; i < sa->icvLen; i++)
+      //If the computed and received ICVs match, then the datagram is valid, and
+      //it is accepted (refer to RFC 4303, section 3.4.4.1)
+      if(cryptoCompMem(checksum, icv, sa->icvLen) != 0)
       {
-         mask |= checksum[i] ^ icv[i];
+         error = ERROR_DECRYPTION_FAILED;
       }
-
-      //If the computed and received ICVs match, then the datagram is valid,
-      //and it is accepted (refer to RFC 4303, section 3.4.4.1)
-      error = (mask == 0) ? NO_ERROR : ERROR_DECRYPTION_FAILED;
    }
 
    //Return status code
    return error;
+}
+
+
+/**
+ * @brief Parse ESP trailer
+ * @param[in] data Pointer to the decrypted payload data
+ * @param[in] length Length of the decrypted payload data, in bytes
+ * @param[out] padLen Length of the padding, in bytes
+ * @param[out] nextHeader Value of the next header field
+ * @return Error code
+ **/
+
+error_t espParseTrailer(const uint8_t *data, size_t length, size_t *padLen,
+   uint8_t *nextHeader)
+{
+   size_t i;
+   const EspTrailer *espTrailer;
+
+   //Malformed ESP trailer?
+   if(length < sizeof(EspTrailer))
+      return ERROR_DECRYPTION_FAILED;
+
+   //Point to the ESP trailer
+   length -= sizeof(EspTrailer);
+   espTrailer = (const EspTrailer *) (data + length);
+
+   //The Pad Length field is the length of the Padding field
+   if(espTrailer->padLength > length)
+      return ERROR_DECRYPTION_FAILED;
+
+   //The receiver should inspect the Padding field (refer to RFC 4303,
+   //section 2.4)
+   for(i = 0; i < espTrailer->padLength; i++)
+   {
+      //Padding bytes make up a monotonically increasing sequence
+      if(data[length - espTrailer->padLength + i] != (i + 1))
+         return ERROR_DECRYPTION_FAILED;
+   }
+
+   //Return the length of the padding
+   *padLen = espTrailer->padLength;
+
+   //The Next Header field identifies the type of data contained in the
+   //payload data (refer to RFC 4303, section 2.6)
+   *nextHeader = espTrailer->nextHeader;
+
+   //Successful processing
+   return NO_ERROR;
 }
 
 #endif

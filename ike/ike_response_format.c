@@ -123,12 +123,6 @@ error_t ikeSendIkeSaInitResponse(IkeSaEntry *sa)
    //Successful IKE SA creation?
    if(sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_NONE)
    {
-      //Save the first message (IKE_SA_INIT request), starting with the first
-      //octet of the first SPI in the header and ending with the last octet of
-      //the last payload
-      osMemcpy(sa->request, sa->initiatorSaInit, sa->initiatorSaInitLen);
-      sa->initiatorSaInit = sa->request;
-
       //Each endpoint chooses one of the two SPIs and must choose them so as to
       //be unique identifiers of an IKE SA (refer to RFC 7296, section 2.6)
       error = ikeGenerateSaSpi(sa, sa->responderSpi);
@@ -239,12 +233,6 @@ error_t ikeSendIkeAuthResponse(IkeSaEntry *sa)
    //Point to the Child SA
    childSa = sa->childSa2;
 
-   //Save the second message (IKE_SA_INIT response), starting with the first
-   //octet of the first SPI in the header and ending with the last octet of
-   //the last payload
-   osMemcpy(context->message, sa->responderSaInit, sa->responderSaInitLen);
-   sa->responderSaInit = context->message;
-
    //Successful Child SA creation?
    if(childSa != NULL)
    {
@@ -304,6 +292,10 @@ error_t ikeSendIkeAuthResponse(IkeSaEntry *sa)
          sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_INTERNAL_ADDRESS_FAILURE ||
          sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_FAILED_CP_REQUIRED)
       {
+         //Release Diffie-Hellman context
+         ikeFreeKeContext(&sa->keContext);
+         ikeInitKeContext(&sa->keContext);
+
          //The responder has sent the IKE_AUTH response
          ikeChangeSaState(sa, IKE_SA_STATE_OPEN);
 
@@ -326,13 +318,8 @@ error_t ikeSendIkeAuthResponse(IkeSaEntry *sa)
          //IKE SA currently active between the authenticated identities
          if(sa->initialContact)
          {
-            //It may be sent when an IKE SA is established after a crash, and the
-            //recipient may use this information to delete any other IKE SAs it
-            //has to the same authenticated identity without waiting for a timeout
+            //Delete duplicate IKE SAs
             ikeDeleteDuplicateSaEntries(sa);
-
-            //Reset flag
-            sa->initialContact = FALSE;
          }
 #endif
       }
@@ -342,10 +329,10 @@ error_t ikeSendIkeAuthResponse(IkeSaEntry *sa)
       }
       else
       {
-         //Only authentication failures (AUTHENTICATION_FAILED) and malformed
-         //messages (INVALID_SYNTAX) lead to a deletion of the IKE SA without
-         //requiring an explicit INFORMATIONAL exchange carrying a Delete
-         //payload
+         //Only authentication failures (AUTHENTICATION_FAILED and EAP failure)
+         //and malformed messages (INVALID_SYNTAX) lead to a deletion of the
+         //IKE SA without requiring an explicit INFORMATIONAL exchange carrying
+         //a Delete payload
          error = ERROR_AUTHENTICATION_FAILED;
       }
    }
@@ -551,7 +538,7 @@ error_t ikeFormatIkeSaInitResponse(IkeSaEntry *sa, uint8_t *p, size_t *length)
    ikeHeader->minorVersion = IKE_MINOR_VERSION;
    ikeHeader->exchangeType = IKE_EXCHANGE_TYPE_IKE_SA_INIT;
    ikeHeader->flags = IKE_FLAGS_R;
-   ikeHeader->messageId = htonl(sa->rxMessageId);
+   ikeHeader->messageId = HTONL(0);
 
    //Keep track of the Next Payload field
    nextPayload = &ikeHeader->nextPayload;
@@ -584,11 +571,6 @@ error_t ikeFormatIkeSaInitResponse(IkeSaEntry *sa, uint8_t *p, size_t *length)
       p += n;
       *length += n;
 
-      //The ephemeral private key must be destroyed as soon as possible (refer
-      //to RFC 9206, section 10)
-      ikeFreeKeContext(&sa->keContext);
-      ikeInitKeContext(&sa->keContext);
-
       //The responder sends its nonce in the Nr payload
       error = ikeFormatNoncePayload(sa, NULL, p, &n, &nextPayload);
       //Any error to report?
@@ -613,7 +595,7 @@ error_t ikeFormatIkeSaInitResponse(IkeSaEntry *sa, uint8_t *p, size_t *length)
       //Check whether the initiator has included Notify payloads of type
       //NAT_DETECTION_SOURCE_IP and NAT_DETECTION_DESTINATION_IP in its
       //IKE_SA_INIT request
-      if(sa->natDetectSrcIp && sa->natDetectDestIp)
+      if(sa->natDetectSrcIpReceived && sa->natDetectDestIpReceived)
       {
          //There MAY be multiple NAT_DETECTION_SOURCE_IP payloads in a message
          //if the sender does not know which of several network attachments will
@@ -641,6 +623,21 @@ error_t ikeFormatIkeSaInitResponse(IkeSaEntry *sa, uint8_t *p, size_t *length)
          p += n;
          *length += n;
       }
+#endif
+
+#if (IKE_CREATE_CHILD_SA_SUPPORT == ENABLED)
+      //A responder advertises support by childless IKEv2 initiation by
+      //including a CHILDLESS_IKEV2_SUPPORTED notification in the IKE_SA_INIT
+      //response (refer to RFC 6023, section 3)
+      error = ikeFormatNotifyPayload(sa, NULL,
+         IKE_NOTIFY_MSG_TYPE_CHILDLESS_IKEV2_SUPPORTED, p, &n, &nextPayload);
+      //Any error to report?
+      if(error)
+         return error;
+
+      //Point to the next payload
+      p += n;
+      *length += n;
 #endif
 
 #if (IKE_SIGN_HASH_ALGOS_SUPPORT == ENABLED)
@@ -673,12 +670,6 @@ error_t ikeFormatIkeSaInitResponse(IkeSaEntry *sa, uint8_t *p, size_t *length)
    //The Length field indicates the total length of the IKE message in octets
    ikeHeader->length = htonl(*length);
 
-   //Save the second message (IKE_SA_INIT response), starting with the first
-   //octet of the first SPI in the header and ending with the last octet of
-   //the last payload
-   sa->responderSaInit = sa->response + IKE_PREFIX_SIZE;
-   sa->responderSaInitLen = *length;
-
    //Successful processing
    return NO_ERROR;
 }
@@ -698,7 +689,6 @@ error_t ikeFormatIkeAuthResponse(IkeSaEntry *sa, uint8_t *p, size_t *length)
    size_t n;
    uint8_t *nextPayload;
    IkeHeader *ikeHeader;
-   IkeIdPayload *idPayload;
 
    //Total length of the message
    *length = 0;
@@ -740,9 +730,6 @@ error_t ikeFormatIkeAuthResponse(IkeSaEntry *sa, uint8_t *p, size_t *length)
       if(error)
          return error;
 
-      //Point to the Identification payload
-      idPayload = (IkeIdPayload *) p;
-
       //Point to the next payload
       p += n;
       *length += n;
@@ -759,7 +746,7 @@ error_t ikeFormatIkeAuthResponse(IkeSaEntry *sa, uint8_t *p, size_t *length)
 
       //The responder authenticates its identity and protects the integrity
       //of the second message with the AUTH payload
-      error = ikeFormatAuthPayload(sa, idPayload, p, &n, &nextPayload);
+      error = ikeFormatAuthPayload(sa, p, &n, &nextPayload);
       //Any error to report?
       if(error)
          return error;
@@ -1270,8 +1257,7 @@ error_t ikeFormatChildSaCreateResponse(IkeSaEntry *sa, uint8_t *p,
       p += n;
       *length += n;
 
-      //The ephemeral private key must be destroyed as soon as possible (refer
-      //to RFC 9206, section 10)
+      //Release Diffie-Hellman context
       ikeFreeKeContext(&childSa->keContext);
       ikeInitKeContext(&childSa->keContext);
    }
@@ -1358,8 +1344,7 @@ error_t ikeFormatIkeSaRekeyResponse(IkeSaEntry *sa, uint8_t *p, size_t *length,
    //Total length of the payloads
    *length += n;
 
-   //The ephemeral private key must be destroyed as soon as possible (refer to
-   //RFC 9206, section 10)
+   //Release Diffie-Hellman context
    ikeFreeKeContext(&newSa->keContext);
    ikeInitKeContext(&newSa->keContext);
 

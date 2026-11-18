@@ -42,40 +42,38 @@ extern "C" {
 #endif
 
 //IKEv2 related functions
-error_t ikeVerifySignature(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
-   uint8_t authMethod, const X509SubjectPublicKeyInfo *publicKeyInfo,
-   const uint8_t *signature, size_t signatureLen);
-
-error_t ikeVerifyDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const X509SubjectPublicKeyInfo *publicKeyInfo,
-   const IkeAuthData *authData, size_t authDataLen);
-
-error_t ikeVerifyRsaSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const X509SubjectPublicKeyInfo *publicKeyInfo,
-   const HashAlgo *hashAlgo, const uint8_t *signature, size_t signatureLen);
-
-error_t ikeVerifyRsaPssSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const X509SubjectPublicKeyInfo *publicKeyInfo,
-   const HashAlgo *hashAlgo, size_t saltLen, const uint8_t *signature,
+error_t ikeVerifySignature(IkeSaEntry *sa, uint8_t authMethod,
+   const X509SubjectPublicKeyInfo *publicKeyInfo, const uint8_t *signature,
    size_t signatureLen);
 
-error_t ikeVerifyDsaSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const X509SubjectPublicKeyInfo *publicKeyInfo,
+error_t ikeVerifyDigitalSignature(IkeSaEntry *sa,
+   const X509SubjectPublicKeyInfo *publicKeyInfo, const IkeAuthData *authData,
+   size_t authDataLen);
+
+error_t ikeVerifyRsaSignature(IkeSaEntry *sa,
+   const X509SubjectPublicKeyInfo *publicKeyInfo, const HashAlgo *hashAlgo,
+   const uint8_t *signature, size_t signatureLen);
+
+error_t ikeVerifyRsaPssSignature(IkeSaEntry *sa,
+   const X509SubjectPublicKeyInfo *publicKeyInfo, const HashAlgo *hashAlgo,
+   size_t saltLen, const uint8_t *signature, size_t signatureLen);
+
+error_t ikeVerifyDsaSignature(IkeSaEntry *sa,
+   const X509SubjectPublicKeyInfo *publicKeyInfo, const HashAlgo *hashAlgo,
+   const uint8_t *signature, size_t signatureLen, IkeSignFormat format);
+
+error_t ikeVerifyEcdsaSignature(IkeSaEntry *sa,
+   const X509SubjectPublicKeyInfo *publicKeyInfo, const EcCurve *group,
    const HashAlgo *hashAlgo, const uint8_t *signature, size_t signatureLen,
    IkeSignFormat format);
 
-error_t ikeVerifyEcdsaSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const X509SubjectPublicKeyInfo *publicKeyInfo,
-   const EcCurve *group, const HashAlgo *hashAlgo, const uint8_t *signature,
-   size_t signatureLen, IkeSignFormat format);
+error_t ikeVerifyEd25519Signature(IkeSaEntry *sa,
+   const X509SubjectPublicKeyInfo *publicKeyInfo, const uint8_t *signature,
+   size_t signatureLen);
 
-error_t ikeVerifyEd25519Signature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const X509SubjectPublicKeyInfo *publicKeyInfo,
-   const uint8_t *signature, size_t signatureLen);
-
-error_t ikeVerifyEd448Signature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const X509SubjectPublicKeyInfo *publicKeyInfo,
-   const uint8_t *signature, size_t signatureLen);
+error_t ikeVerifyEd448Signature(IkeSaEntry *sa,
+   const X509SubjectPublicKeyInfo *publicKeyInfo, const uint8_t *signature,
+   size_t signatureLen);
 
 //C++ guard
 #ifdef __cplusplus

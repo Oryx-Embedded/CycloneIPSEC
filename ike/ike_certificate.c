@@ -248,10 +248,13 @@ error_t ikeGetCertSubjectDn(const char_t *cert, size_t certLen,
                if(!error)
                {
                   //Copy the X.500 distinguished name
-                  osMemcpy(subjectDn, certInfo->tbsCert.subject.raw.value,
-                     certInfo->tbsCert.subject.raw.length);
+                  if(subjectDn != NULL)
+                  {
+                     osMemcpy(subjectDn, certInfo->tbsCert.subject.raw.value,
+                        certInfo->tbsCert.subject.raw.length);
+                  }
 
-                  //Total length of the payload
+                  //Total length of the X.500 distinguished name
                   *subjectDnLen = certInfo->tbsCert.subject.raw.length;
                }
 
@@ -486,7 +489,7 @@ error_t ikeParseCertificateChain(IkeSaEntry *sa, IpsecPadEntry *padEntry,
       }
 
       //The first CERT payload holds the public key used to validate the
-      //sender's AUTH payload (refer to RFC7296, section 3.6)
+      //sender's AUTH payload (refer to RFC 7296, section 3.6)
       certPayload = (IkeCertPayload *) ikeGetPayload(message, length,
          IKE_PAYLOAD_TYPE_CERT, 0);
       //CERT payload no found?
@@ -527,12 +530,6 @@ error_t ikeParseCertificateChain(IkeSaEntry *sa, IpsecPadEntry *padEntry,
          break;
       }
 
-      //Check certificate key usage
-      error = ikeCheckKeyUsage(certInfo);
-      //Any error to report?
-      if(error)
-         break;
-
       //Check if the end-entity certificate can be matched with a trusted CA
       certValidResult = ikeValidateCertificate(sa, padEntry, certInfo, 0);
 
@@ -545,7 +542,7 @@ error_t ikeParseCertificateChain(IkeSaEntry *sa, IpsecPadEntry *padEntry,
       }
 
       //PKIX path validation
-      for(i = 0; length > 0; i++)
+      for(i = 0; ; i++)
       {
          //If a chain of certificates needs to be sent, multiple CERT payloads
          //are used (refer to RFC 7296, section 3.6)
@@ -592,8 +589,15 @@ error_t ikeParseCertificateChain(IkeSaEntry *sa, IpsecPadEntry *padEntry,
          //Certificate chain validation in progress?
          if(certValidResult == ERROR_UNKNOWN_CA)
          {
+            X509Options options;
+
+            //Certificate validation options
+            options = X509_DEFAULT_OPTIONS;
+            options.disableValidityCheck = padEntry->disableCertValidityCheck;
+
             //Validate current certificate
-            error = x509ValidateCertificate(certInfo, issuerCertInfo, i);
+            error = x509ValidateCertificateEx(certInfo, issuerCertInfo, i,
+               &options);
             //Certificate validation failed?
             if(error)
                break;
@@ -611,7 +615,7 @@ error_t ikeParseCertificateChain(IkeSaEntry *sa, IpsecPadEntry *padEntry,
             //Check if the intermediate certificate can be matched with a
             //trusted CA
             certValidResult = ikeValidateCertificate(sa, padEntry,
-               issuerCertInfo, i);
+               issuerCertInfo, i + 1);
 
             //Check validation result
             if(certValidResult != NO_ERROR && certValidResult != ERROR_UNKNOWN_CA)
@@ -660,16 +664,7 @@ error_t ikeValidateCertificate(IkeSaEntry *sa, IpsecPadEntry *padEntry,
    const X509CertInfo *certInfo, uint_t pathLen)
 {
    error_t error;
-   size_t pemCertLen;
-   const char_t *trustedCaList;
-   size_t trustedCaListLen;
-   uint8_t *derCert;
-   size_t derCertLen;
    IkeContext *context;
-   X509CertInfo *caCertInfo;
-
-   //Initialize status code
-   error = ERROR_UNKNOWN_CA;
 
    //Point to the IKE context
    context = sa->context;
@@ -680,6 +675,75 @@ error_t ikeValidateCertificate(IkeSaEntry *sa, IpsecPadEntry *padEntry,
       //Invoke user callback function
       error = context->certVerifyCallback(sa, certInfo, pathLen);
    }
+   else
+   {
+      //End-entity certificate?
+      if(pathLen == 0)
+      {
+         //Implementations must provide a means for an administrator to require
+         //a match between an asserted IKE ID and the subject name or subject
+         //alt name in a certificate (refer to RFC 4301, section 4.4.3.2)
+         if(sa->peerId.type == IKE_ID_TYPE_FQDN)
+         {
+            char_t fqdn[IKE_MAX_ID_LEN + 1];
+
+            //Copy the fully-qualified domain name
+            osMemcpy(fqdn, sa->peerId.data, sa->peerId.length);
+            fqdn[sa->peerId.length] = '\0';
+
+            //Check whether the certificate matches the FQDN
+            error = x509CheckSubjectName(certInfo, fqdn);
+         }
+         else if(sa->peerId.type == IKE_ID_TYPE_DER_ASN1_DN)
+         {
+            //Check whether the certificate matches the DN
+            if(certInfo->tbsCert.subject.raw.length == sa->peerId.length &&
+               osMemcmp(certInfo->tbsCert.subject.raw.value, sa->peerId.data,
+               sa->peerId.length) == 0)
+            {
+               error = NO_ERROR;
+            }
+            else
+            {
+               error = ERROR_BAD_CERTIFICATE;
+            }
+         }
+         else
+         {
+            //RFC 4301 does not require that the IKE ID asserted by a peer be
+            //syntactically related to a specific field in an end entity
+            //certificate that is employed to authenticate the identity of that
+            //peer
+            error = NO_ERROR;
+         }
+
+         //Check status code
+         if(!error)
+         {
+            //Check certificate key usage
+            error = ikeCheckKeyUsage(certInfo);
+         }
+
+         //Check status code
+         if(!error)
+         {
+            //Check certificate extended key usage
+            error = ikeCheckExtendedKeyUsage(certInfo);
+         }
+
+         //Check status code
+         if(!error)
+         {
+            //Verify the end-entity certificate against root CAs
+            error = ERROR_UNKNOWN_CA;
+         }
+      }
+      else
+      {
+         //Verify the intermediate certificate against root CAs
+         error = ERROR_UNKNOWN_CA;
+      }
+   }
 
    //Check status code
    if(error == NO_ERROR)
@@ -688,13 +752,31 @@ error_t ikeValidateCertificate(IkeSaEntry *sa, IpsecPadEntry *padEntry,
    }
    else if(error == ERROR_UNKNOWN_CA)
    {
-      //Check whether the certificate should be checked against root CAs
-      if(padEntry->trustedCaListLen > 0)
+      //Check whether the certificate chain should be validated
+      if(padEntry->disableCertChainValidation)
       {
+         //Do not check the certificate against root CAs
+         error = NO_ERROR;
+      }
+      else if(padEntry->authData.trustedCaList != NULL &&
+         padEntry->authData.trustedCaListLen > 0)
+      {
+         size_t pemCertLen;
+         const char_t *trustedCaList;
+         size_t trustedCaListLen;
+         uint8_t *derCert;
+         size_t derCertLen;
+         X509CertInfo *caCertInfo;
+         X509Options options;
+
+         //Certificate validation options
+         options = X509_DEFAULT_OPTIONS;
+         options.disableValidityCheck = padEntry->disableCertValidityCheck;
+
          //Point to the first trusted CA certificate
-         trustedCaList = padEntry->trustedCaList;
+         trustedCaList = padEntry->authData.trustedCaList;
          //Get the total length, in bytes, of the trusted CA list
-         trustedCaListLen = padEntry->trustedCaListLen;
+         trustedCaListLen = padEntry->authData.trustedCaListLen;
 
          //Allocate a memory buffer to store X.509 certificate info
          caCertInfo = ikeAllocMem(sizeof(X509CertInfo));
@@ -735,8 +817,8 @@ error_t ikeValidateCertificate(IkeSaEntry *sa, IpsecPadEntry *padEntry,
                      if(!error)
                      {
                         //Validate the certificate with the current CA
-                        error = x509ValidateCertificate(certInfo, caCertInfo,
-                           pathLen);
+                        error = x509ValidateCertificateEx(certInfo, caCertInfo,
+                           pathLen, &options);
                      }
 
                      //Check status code
@@ -783,8 +865,8 @@ error_t ikeValidateCertificate(IkeSaEntry *sa, IpsecPadEntry *padEntry,
       }
       else
       {
-         //Do not check the certificate against root CAs
-         error = NO_ERROR;
+         //No trusted CA list is configured
+         error = ERROR_UNKNOWN_CA;
       }
    }
    else if(error == ERROR_BAD_CERTIFICATE ||
@@ -817,12 +899,11 @@ error_t ikeCheckKeyUsage(const X509CertInfo *certInfo)
 {
    error_t error;
    const X509KeyUsage *keyUsage;
-   const X509ExtendedKeyUsage *extKeyUsage;
 
    //Initialize status code
    error = NO_ERROR;
 
-   //Point to the KeyUsage extension
+   //Point to the KeyUsage (KU) extension
    keyUsage = &certInfo->tbsCert.extensions.keyUsage;
 
    //Check if the KeyUsage extension is present
@@ -838,7 +919,26 @@ error_t ikeCheckKeyUsage(const X509CertInfo *certInfo)
       }
    }
 
-   //Point to the ExtendedKeyUsage extension
+   //Return status code
+   return error;
+}
+
+
+/**
+ * @brief Check certificate extended key usage
+ * @param[in] certInfo Pointer to the X.509 certificate
+ * @return Error code
+ **/
+
+error_t ikeCheckExtendedKeyUsage(const X509CertInfo *certInfo)
+{
+   error_t error;
+   const X509ExtendedKeyUsage *extKeyUsage;
+
+   //Initialize status code
+   error = NO_ERROR;
+
+   //Point to the ExtendedKeyUsage (EKU) extension
    extKeyUsage = &certInfo->tbsCert.extensions.extKeyUsage;
 
    //Check if the ExtendedKeyUsage extension is present
@@ -847,7 +947,8 @@ error_t ikeCheckKeyUsage(const X509CertInfo *certInfo)
       //If ExtendedKeyUsage is present and contains either id-kp-ipsecIKE or
       //anyExtendedKeyUsage, continue. Otherwise, reject certificate (refer
       //to RFC 4945, section 5.1.3.12)
-      if((extKeyUsage->bitmap & X509_EXT_KEY_USAGE_IPSEC_IKE) == 0)
+      if((extKeyUsage->bitmap & X509_EXT_KEY_USAGE_IPSEC_IKE) == 0 &&
+         (extKeyUsage->bitmap & X509_EXT_KEY_USAGE_ANY) == 0)
       {
          error = ERROR_BAD_CERTIFICATE;
       }

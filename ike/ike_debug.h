@@ -97,8 +97,15 @@ void ikeDumpTs(const IkeTs *selector, size_t length);
 
 void ikeDumpEncryptedPayload(const IkeEncryptedPayload *payload, size_t length);
 
+void ikeDumpConfigPayload(const IkeConfigPayload *payload, size_t length);
+void ikeDumpConfigAttr(const IkeConfigAttr *attr, size_t length);
+
+void ikeDumpEapPayload(const IkeEapPayload *payload, size_t length);
+
 void ikeDumpEncryptedFragPayload(const IkeEncryptedFragPayload *payload,
    size_t length);
+
+void ikeDumpString(const char_t *prefix, const uint8_t *s, size_t length);
 
 const char_t *ikeGetParamName(uint_t value, const IkeParamName *paramList,
    size_t paramListLen);

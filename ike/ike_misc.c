@@ -365,6 +365,16 @@ void ikeDeleteSaEntry(IkeSaEntry *sa)
       //those keys (refer to RFC 7296, section 2.12)
       ikeFreeKeContext(&sa->keContext);
 
+      //Erase the shared secret and the keying material
+      cryptoZeroizeMem(sa->sharedSecret, IKE_MAX_SHARED_SECRET_LEN);
+      cryptoZeroizeMem(sa->keyMaterial, IKE_MAX_SA_KEY_MAT_LEN);
+
+#if (IKE_EAP_AUTH_SUPPORT == ENABLED)
+      //Erase master session key
+      cryptoZeroizeMem(sa->msk, sizeof(sa->msk));
+      sa->mskLen = 0;
+#endif
+
       //Loop through Child SA entries
       for(i = 0; i < context->numChildSaEntries; i++)
       {
@@ -401,7 +411,7 @@ void ikeDeleteSaEntry(IkeSaEntry *sa)
 
 
 /**
- * @brief Delete an duplicate IKE Security Associations
+ * @brief Delete duplicate IKE Security Associations
  * @param[in] sa Pointer to the currently active IKE SA
  **/
 
@@ -427,15 +437,18 @@ void ikeDeleteDuplicateSaEntries(IkeSaEntry *sa)
       if(entry != sa && entry->state != IKE_SA_STATE_CLOSED)
       {
          //Different IKE SA with same authenticated identity?
-         if(entry->peerIdType == sa->peerIdType &&
-            entry->peerIdLen == sa->peerIdLen &&
-            osMemcmp(entry->peerId, sa->peerId, sa->peerIdLen) == 0)
+         if(entry->peerId.type == sa->peerId.type &&
+            entry->peerId.length == sa->peerId.length)
          {
-            //The recipient of an INITIAL_CONTACT notification may use this
-            //information to delete any other IKE SAs it has to the same
-            //authenticated identity without waiting for a timeout (refer to
-            //RFC 7296, section 2.4)
-            ikeDeleteSaEntry(entry);
+            if(osMemcmp(entry->peerId.data, sa->peerId.data,
+               sa->peerId.length) == 0)
+            {
+               //The recipient of an INITIAL_CONTACT notification may use this
+               //information to delete any other IKE SAs it has to the same
+               //authenticated identity without waiting for a timeout (refer to
+               //RFC 7296, section 2.4)
+               ikeDeleteSaEntry(entry);
+            }
          }
       }
    }
@@ -581,6 +594,14 @@ void ikeDeleteChildSaEntry(IkeChildSaEntry *childSa)
       {
          ipsecClearSadEntry(ipsecContext, childSa->outboundSa);
       }
+
+#if (IKE_CHILD_SA_PFS_SUPPORT == ENABLED)
+      //Erase the shared secret
+      cryptoZeroizeMem(childSa->sharedSecret, IKE_MAX_SHARED_SECRET_LEN);
+#endif
+
+      //Erase the keying material
+      cryptoZeroizeMem(childSa->keyMaterial, IKE_MAX_CHILD_SA_KEY_MAT_LEN);
 
       //Mark the Child SA as closed
       childSa->state = IKE_CHILD_SA_STATE_CLOSED;
@@ -853,47 +874,6 @@ systime_t ikeRandomizeDelay(IkeContext *context, systime_t delay)
 
 
 /**
- * @brief Perform ID substitution
- * @param[in] sa Pointer to the IKE SA
- **/
-
-void ikeSubstituteId(IkeSaEntry *sa)
-{
-#if (IPV4_SUPPORT == ENABLED)
-   //IPv4 address identity?
-   if(sa->peerIdType == IKE_ID_TYPE_IPV4_ADDR &&
-      sa->peerIdLen == sizeof(Ipv4Addr))
-   {
-      //Perform IPv4 address substitution
-      if(sa->context->remoteIpAddr.length == sizeof(Ipv4Addr))
-      {
-         ipv4CopyAddr(sa->peerId, &sa->context->remoteIpAddr.ipv4Addr);
-      }
-   }
-   else
-#endif
-#if (IPV6_SUPPORT == ENABLED)
-   //IPv4 address identity?
-   if(sa->peerIdType == IKE_ID_TYPE_IPV6_ADDR &&
-      sa->peerIdLen == sizeof(Ipv6Addr))
-   {
-      //Perform IPv6 address substitution
-      if(sa->context->remoteIpAddr.length == sizeof(Ipv6Addr))
-      {
-         //Perform IPv6 address substitution
-         ipv6CopyAddr(sa->peerId, &sa->context->remoteIpAddr.ipv6Addr);
-      }
-   }
-   else
-#endif
-   //Unknown identity type?
-   {
-      //Just for sanity
-   }
-}
-
-
-/**
  * @brief Traffic selector selection
  * @param[in] childSa Pointer to the Child SA
  * @param[in] tsiPayload Pointer to the TSi payload
@@ -997,6 +977,8 @@ error_t ikeSelectTs(IkeChildSaEntry *childSa, const IkeTsPayload *tsiPayload,
 
       //Set the security protocol (AH or ESP) to employ
       childSa->protocol = childSa->oldChildSa->protocol;
+      //Determine whether or not to use extended sequence numbers
+      childSa->esn = childSa->oldChildSa->esn;
    }
    else
    {
@@ -1027,6 +1009,8 @@ error_t ikeSelectTs(IkeChildSaEntry *childSa, const IkeTsPayload *tsiPayload,
 
       //The SPD entry specifies the security protocol (AH or ESP) to employ
       childSa->protocol = spdEntry->protocol;
+      //The SPD entry specifies whether or not to use extended sequence numbers
+      childSa->esn = spdEntry->esn;
    }
 
    //Successful processing
@@ -1490,7 +1474,7 @@ error_t ikeCreateIpsecSaPair(IkeChildSaEntry *childSa)
    sadEntry.authHashAlgo = childSa->authHashAlgo;
    sadEntry.authKeyLen = childSa->authKeyLen;
    sadEntry.icvLen = childSa->icvLen;
-   sadEntry.esn = (childSa->esn == IKE_TRANSFORM_ID_ESN_YES) ? TRUE : FALSE;
+   sadEntry.esn = (childSa->snId == IKE_TRANSFORM_ID_SN_64BIT) ? TRUE : FALSE;
    sadEntry.seqNum = 0;
    sadEntry.antiReplayEnabled = TRUE;
 
@@ -1561,7 +1545,7 @@ error_t ikeCreateIpsecSaPair(IkeChildSaEntry *childSa)
       sadEntry.authHashAlgo = childSa->authHashAlgo;
       sadEntry.authKeyLen = childSa->authKeyLen;
       sadEntry.icvLen = childSa->icvLen;
-      sadEntry.esn = (childSa->esn == IKE_TRANSFORM_ID_ESN_YES) ? TRUE : FALSE;
+      sadEntry.esn = (childSa->snId == IKE_TRANSFORM_ID_SN_64BIT) ? TRUE : FALSE;
       sadEntry.seqNum = 0;
       sadEntry.antiReplayEnabled = TRUE;
 
@@ -1609,6 +1593,13 @@ error_t ikeCreateIpsecSaPair(IkeChildSaEntry *childSa)
       //Update SAD entry (inbound traffic)
       error = ipsecSetSadEntry(ipsecContext, childSa->inboundSa, &sadEntry);
    }
+
+   //The keying material of the Child SA is no longer needed once the keys
+   //have been copied to the SAD entries
+   cryptoZeroizeMem(childSa->keyMaterial, IKE_MAX_CHILD_SA_KEY_MAT_LEN);
+
+   //Erase working state
+   cryptoZeroizeMem(&sadEntry, sizeof(IpsecSadEntry));
 
    //Return status code
    return error;

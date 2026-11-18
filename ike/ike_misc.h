@@ -70,8 +70,6 @@ error_t ikeGenerateNonce(IkeContext *context, uint8_t *nonce, size_t *length);
 
 systime_t ikeRandomizeDelay(IkeContext *context, systime_t delay);
 
-void ikeSubstituteId(IkeSaEntry *sa);
-
 error_t ikeSelectTs(IkeChildSaEntry *childSa, const IkeTsPayload *tsiPayload,
    const IkeTsPayload *tsrPayload);
 

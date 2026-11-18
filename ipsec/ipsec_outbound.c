@@ -96,23 +96,34 @@ error_t ipsecProcessOutboundIpv4Packet(NetInterface *interface,
             }
             else
             {
-               IpsecPacketInfo packetInfo;
+               //Broadcast or multicast packet?
+               if(ipv4IsBroadcastAddr(interface, pseudoHeader->destAddr) ||
+                  ipv4IsMulticastAddr(pseudoHeader->destAddr))
+               {
+                  //Standard IKEv2 cannot negotiate SAs for multicast traffic
+                  error = ERROR_POLICY_FAILURE;
+               }
+               else
+               {
+                  IpsecPacketInfo packetInfo;
 
-               //The key management mechanism is invoked to create the SA
-               packetInfo.localIpAddr.length = sizeof(Ipv4Addr);
-               packetInfo.localIpAddr.ipv4Addr = pseudoHeader->srcAddr;
-               packetInfo.remoteIpAddr.length = sizeof(Ipv4Addr);
-               packetInfo.remoteIpAddr.ipv4Addr = pseudoHeader->destAddr;
-               packetInfo.nextProtocol = pseudoHeader->protocol;
-               packetInfo.localPort = selector.localPort.start;
-               packetInfo.remotePort = selector.remotePort.start;
+                  //The key management mechanism is invoked to create the SA
+                  packetInfo.localIpAddr.length = sizeof(Ipv4Addr);
+                  packetInfo.localIpAddr.ipv4Addr = pseudoHeader->srcAddr;
+                  packetInfo.remoteIpAddr.length = sizeof(Ipv4Addr);
+                  packetInfo.remoteIpAddr.ipv4Addr = pseudoHeader->destAddr;
+                  packetInfo.nextProtocol = pseudoHeader->protocol;
+                  packetInfo.localPort = selector.localPort.start;
+                  packetInfo.remotePort = selector.remotePort.start;
 
-               //Create a new SA
-               ikeCreateChildSa(interface->netContext->ikeContext, &packetInfo);
+                  //Create a new SA using IKEv2
+                  ikeCreateChildSa(interface->netContext->ikeContext, &packetInfo);
 
-               //There is no requirement that an implementation buffer the packet
-               //if there is a cache miss (refer to RFC 4301, section 5.2)
-               error = ERROR_IN_PROGRESS;
+                  //There is no requirement that an implementation buffer the
+                  //packet if there is a cache miss (refer to RFC 4301,
+                  //section 5.2)
+                  error = ERROR_IN_PROGRESS;
+               }
             }
          }
          else if(spdEntry->policyAction == IPSEC_POLICY_ACTION_BYPASS)

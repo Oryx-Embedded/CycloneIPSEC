@@ -49,6 +49,9 @@ error_t espVerifyChecksum(IpsecContext *context, IpsecSadEntry *sa,
    const EspHeader *espHeader, const uint8_t *payload, size_t length,
    const uint8_t *icv);
 
+error_t espParseTrailer(const uint8_t *data, size_t length, size_t *padLen,
+   uint8_t *nextHeader);
+
 //C++ guard
 #ifdef __cplusplus
 }

@@ -103,13 +103,6 @@ error_t ikeSendRequest(IkeSaEntry *sa)
 error_t ikeSendIkeSaInitRequest(IkeSaEntry *sa)
 {
    error_t error;
-   IkeContext *context;
-
-   //Initialize status code
-   error = NO_ERROR;
-
-   //Point to the IKE context
-   context = sa->context;
 
    //The Message ID is a 32-bit quantity, which is zero for the IKE_SA_INIT
    //messages (including retries of the message due to responses such as
@@ -147,65 +140,16 @@ error_t ikeSendIkeSaInitRequest(IkeSaEntry *sa)
 error_t ikeSendIkeAuthRequest(IkeSaEntry *sa)
 {
    error_t error;
-   IkeContext *context;
 
-   //Point to the IKE context
-   context = sa->context;
+   //The message ID is incremented for each subsequent exchange
+   sa->txMessageId++;
 
-   //Save the second message (IKE_SA_INIT response), starting with the first
-   //octet of the first SPI in the header and ending with the last octet of
-   //the last payload
-   osMemcpy(sa->response, sa->responderSaInit, sa->responderSaInitLen);
-   sa->responderSaInit = sa->response;
+   //Four octets of zero are prepended to the IKE header
+   STORE32BE(IKE_PREFIX_VALUE, sa->request);
 
-   //Save the first message (IKE_SA_INIT request), starting with the first
-   //octet of the first SPI in the header and ending with the last octet of
-   //the last payload
-   osMemcpy(context->message, sa->initiatorSaInit, sa->initiatorSaInitLen);
-   sa->initiatorSaInit = context->message;
-
-   //Let g^ir be the Diffie-Hellman shared secret
-   error = ikeComputeSharedSecret(&sa->keContext, sa->sharedSecret,
-      &sa->sharedSecretLen);
-
-   //Check status code
-   if(!error)
-   {
-      //The ephemeral private key must be destroyed as soon as possible (refer
-      //to RFC 9206, section 10)
-      ikeFreeKeContext(&sa->keContext);
-      ikeInitKeContext(&sa->keContext);
-
-      //At this point in the negotiation, each party can generate a quantity
-      //called SKEYSEED, from which all keys are derived for that IKE SA (refer
-      //to RFC 7296, section 1.2)
-      error = ikeGenerateSaKeyMaterial(sa, NULL);
-   }
-
-   //Check status code
-   if(!error)
-   {
-      //Valid Child SA?
-      if(sa->childSa1 != NULL)
-      {
-         //Generate a new SPI for the Child SA
-         error = ikeGenerateChildSaSpi(sa->childSa1, sa->childSa1->localSpi);
-      }
-   }
-
-   //Check status code
-   if(!error)
-   {
-      //The message ID is incremented for each subsequent exchange
-      sa->txMessageId++;
-
-      //Four octets of zero are prepended to the IKE header
-      STORE32BE(IKE_PREFIX_VALUE, sa->request);
-
-      //Format IKE_AUTH request
-      error = ikeFormatIkeAuthRequest(sa, sa->request + IKE_PREFIX_SIZE,
-         &sa->requestLen);
-   }
+   //Format IKE_AUTH request
+   error = ikeFormatIkeAuthRequest(sa, sa->request + IKE_PREFIX_SIZE,
+      &sa->requestLen);
 
    //Check status code
    if(!error)
@@ -242,10 +186,6 @@ error_t ikeSendCreateChildSaRequest(IkeSaEntry *sa)
 {
 #if (IKE_CREATE_CHILD_SA_SUPPORT == ENABLED)
    error_t error;
-   IkeContext *context;
-
-   //Point to the IKE context
-   context = sa->context;
 
    //The message ID is incremented for each subsequent exchange
    sa->txMessageId++;
@@ -311,10 +251,6 @@ error_t ikeSendCreateChildSaRequest(IkeSaEntry *sa)
 error_t ikeSendInfoRequest(IkeSaEntry *sa)
 {
    error_t error;
-   IkeContext *context;
-
-   //Point to the IKE context
-   context = sa->context;
 
    //The message ID is incremented for each subsequent exchange
    sa->txMessageId++;
@@ -404,7 +340,8 @@ error_t ikeSendNatKeepalive(IkeSaEntry *sa)
    //Successful processing
    return NO_ERROR;
 #else
-   //Minimal implementations are not required to support NAT traversal
+   //Minimal implementations are not required to support NAT traversal (refer
+   //to RFC 7296, section 4)
    return ERROR_NOT_IMPLEMENTED;
 #endif
 }
@@ -431,20 +368,15 @@ error_t ikeFormatIkeSaInitRequest(IkeSaEntry *sa, uint8_t *p, size_t *length)
    //Each message begins with the IKE header
    ikeHeader = (IkeHeader *) p;
 
-   //In the first message of an initial IKE exchange, the initiator will not
-   //know the responder's SPI value and will therefore set that field to zero
-   //(refer to RFC 7296, section 2.6)
-   osMemset(sa->responderSpi, 0, IKE_SPI_SIZE);
-
    //Format IKE header
    osMemcpy(ikeHeader->initiatorSpi, sa->initiatorSpi, IKE_SPI_SIZE);
-   osMemcpy(ikeHeader->responderSpi, sa->responderSpi, IKE_SPI_SIZE);
+   osMemset(ikeHeader->responderSpi, 0, IKE_SPI_SIZE);
    ikeHeader->nextPayload = IKE_PAYLOAD_TYPE_LAST;
    ikeHeader->majorVersion = IKE_MAJOR_VERSION;
    ikeHeader->minorVersion = IKE_MINOR_VERSION;
    ikeHeader->exchangeType = IKE_EXCHANGE_TYPE_IKE_SA_INIT;
    ikeHeader->flags = IKE_FLAGS_I;
-   ikeHeader->messageId = htonl(sa->txMessageId);
+   ikeHeader->messageId = HTONL(0);
 
    //Keep track of the Next Payload field
    nextPayload = &ikeHeader->nextPayload;
@@ -546,12 +478,6 @@ error_t ikeFormatIkeSaInitRequest(IkeSaEntry *sa, uint8_t *p, size_t *length)
    //The Length field indicates the total length of the IKE message in octets
    ikeHeader->length = htonl(*length);
 
-   //Save the first message (IKE_SA_INIT request), starting with the first
-   //octet of the first SPI in the header and ending with the last octet of
-   //the last payload
-   sa->initiatorSaInit = sa->request + IKE_PREFIX_SIZE;
-   sa->initiatorSaInitLen = *length;
-
    //Successful processing
    return NO_ERROR;
 }
@@ -571,7 +497,6 @@ error_t ikeFormatIkeAuthRequest(IkeSaEntry *sa, uint8_t *p, size_t *length)
    size_t n;
    uint8_t *nextPayload;
    IkeHeader *ikeHeader;
-   IkeIdPayload *idPayload;
 
    //Total length of the message
    *length = 0;
@@ -596,40 +521,54 @@ error_t ikeFormatIkeAuthRequest(IkeSaEntry *sa, uint8_t *p, size_t *length)
    p += sizeof(IkeHeader);
    *length += sizeof(IkeHeader);
 
-   //The initiator asserts its identity with the IDi payload (refer to RFC 7296,
-   //section 1.2)
-   error = ikeFormatIdPayload(sa, p, &n, &nextPayload);
-   //Any error to report?
-   if(error)
-      return error;
+   //Check EAP state
+   if(sa->eapState == IKE_EAP_STATE_DISABLED ||
+      sa->eapState == IKE_EAP_STATE_INIT)
+   {
+      //The initiator asserts its identity with the IDi payload (refer to
+      //RFC 7296, section 1.2)
+      error = ikeFormatIdPayload(sa, p, &n, &nextPayload);
+      //Any error to report?
+      if(error)
+         return error;
 
-   //Point to the Identification payload
-   idPayload = (IkeIdPayload *) p;
+      //Point to the next payload
+      p += n;
+      *length += n;
 
-   //Point to the next payload
-   p += n;
-   *length += n;
+      //The initiator might send its certificate(s) in CERT payload(s)
+      error = ikeFormatCertPayloads(sa, p, &n, &nextPayload);
+      //Any error to report?
+      if(error)
+         return error;
 
-   //The initiator might send its certificate(s) in CERT payload(s)
-   error = ikeFormatCertPayloads(sa, p, &n, &nextPayload);
-   //Any error to report?
-   if(error)
-      return error;
-
-   //Point to the next payload
-   p += n;
-   *length += n;
+      //Point to the next payload
+      p += n;
+      *length += n;
 
 #if (IKE_INITIAL_CONTACT_SUPPORT == ENABLED)
-   //The INITIAL_CONTACT notification asserts that this IKE SA is the only
-   //IKE SA currently active between the authenticated identities
-   if(ikeIsInitialContact(sa))
-   {
-      //It may be sent when an IKE SA is established after a crash, and the
-      //recipient may use this information to delete any other IKE SAs it
-      //has to the same authenticated identity without waiting for a timeout
-      error = ikeFormatNotifyPayload(sa, NULL,
-         IKE_NOTIFY_MSG_TYPE_INITIAL_CONTACT, p, &n, &nextPayload);
+      //The INITIAL_CONTACT notification asserts that this IKE SA is the only
+      //IKE SA currently active between the authenticated identities
+      if(ikeIsInitialContact(sa))
+      {
+         //It may be sent when an IKE SA is established after a crash, and the
+         //recipient may use this information to delete any other IKE SAs it
+         //has to the same authenticated identity without waiting for a timeout
+         error = ikeFormatNotifyPayload(sa, NULL,
+            IKE_NOTIFY_MSG_TYPE_INITIAL_CONTACT, p, &n, &nextPayload);
+         //Any error to report?
+         if(error)
+            return error;
+
+         //Point to the next payload
+         p += n;
+         *length += n;
+      }
+#endif
+
+      //The initiator might also send list of its trust anchors in CERTREQ
+      //payload(s)
+      error = ikeFormatCertReqPayload(sa, p, &n, &nextPayload);
       //Any error to report?
       if(error)
          return error;
@@ -638,42 +577,61 @@ error_t ikeFormatIkeAuthRequest(IkeSaEntry *sa, uint8_t *p, size_t *length)
       p += n;
       *length += n;
    }
-#endif
 
-   //The initiator might also send list of its trust anchors in CERTREQ
-   //payload(s)
-   error = ikeFormatCertReqPayload(sa, p, &n, &nextPayload);
-   //Any error to report?
-   if(error)
-      return error;
-
-   //Point to the next payload
-   p += n;
-   *length += n;
-
-   //The initiator proves knowledge of the secret corresponding to IDi and
-   //integrity protects the contents of the first message using the AUTH payload
-   error = ikeFormatAuthPayload(sa, idPayload, p, &n, &nextPayload);
-   //Any error to report?
-   if(error)
-      return error;
-
-   //Point to the next payload
-   p += n;
-   *length += n;
-
-   //Child SAs can be created either by being piggybacked on the IKE_AUTH
-   //exchange, or using a separate CREATE_CHILD_SA exchange
-   if(sa->childSa1 != NULL)
+   //Check EAP state
+   if(sa->eapState == IKE_EAP_STATE_DISABLED ||
+      sa->eapState == IKE_EAP_STATE_SUCCESS)
    {
-      //Piggyback setup of the Child SA
-      error = ikeFormatChildSaCreateRequest(sa, p, &n, &nextPayload);
+      //The initiator proves knowledge of the secret corresponding to IDi and
+      //integrity protects the contents of the first message using the AUTH
+      //payload
+      error = ikeFormatAuthPayload(sa, p, &n, &nextPayload);
       //Any error to report?
       if(error)
          return error;
 
-      //Total length of the message
+      //Point to the next payload
+      p += n;
       *length += n;
+   }
+   else if(sa->eapState == IKE_EAP_STATE_INIT)
+   {
+      //An initiator indicates a desire to use EAP by leaving out the AUTH
+      //payload from the first message in the IKE_AUTH exchange (refer to
+      //RFC 7296, section 2.16)
+   }
+   else
+   {
+      //The Extensible Authentication Protocol payload allows IKE SAs to be
+      //authenticated using the EAP protocol
+      error = ikeFormatEapPayload(sa, p, &n, &nextPayload);
+      //Any error to report?
+      if(error)
+         return error;
+
+      //Point to the next payload
+      p += n;
+      *length += n;
+   }
+
+   //Check EAP state
+   if(sa->eapState == IKE_EAP_STATE_DISABLED ||
+      sa->eapState == IKE_EAP_STATE_INIT)
+   {
+
+      //Child SAs can be created either by being piggybacked on the IKE_AUTH
+      //exchange, or using a separate CREATE_CHILD_SA exchange
+      if(sa->childSa1 != NULL)
+      {
+         //Piggyback setup of the Child SA
+         error = ikeFormatChildSaCreateRequest(sa, p, &n, &nextPayload);
+         //Any error to report?
+         if(error)
+            return error;
+
+         //Total length of the message
+         *length += n;
+      }
    }
 
    //The Length field indicates the total length of the IKE message in octets

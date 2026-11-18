@@ -33,7 +33,6 @@
 
 //Dependencies
 #include "ipsec/ipsec.h"
-#include "cipher/cipher_algorithms.h"
 #include "pkc/key_exch_algorithms.h"
 #include "pkix/x509_common.h"
 
@@ -91,11 +90,46 @@
    #error IKE_PSK_AUTH_SUPPORT parameter is not valid
 #endif
 
+//EAP authentication
+#ifndef IKE_EAP_AUTH_SUPPORT
+   #define IKE_EAP_AUTH_SUPPORT DISABLED
+#elif (IKE_EAP_AUTH_SUPPORT != ENABLED && IKE_EAP_AUTH_SUPPORT != DISABLED)
+   #error IKE_EAP_AUTH_SUPPORT
+#endif
+
+//MD5-Challenge authentication method (weak)
+#ifndef IKE_EAP_MD5_SUPPORT
+   #define IKE_EAP_MD5_SUPPORT DISABLED
+#elif (IKE_EAP_MD5_SUPPORT != ENABLED && IKE_EAP_MD5_SUPPORT != DISABLED)
+   #error IKE_EAP_MD5_SUPPORT parameter is not valid
+#endif
+
+//MS-CHAP-V2 authentication method
+#ifndef IKE_EAP_MSCHAPV2_SUPPORT
+   #define IKE_EAP_MSCHAPV2_SUPPORT DISABLED
+#elif (IKE_EAP_MSCHAPV2_SUPPORT != ENABLED && IKE_EAP_MSCHAPV2_SUPPORT != DISABLED)
+   #error IKE_EAP_MSCHAPV2_SUPPORT parameter is not valid
+#endif
+
+//Maximum number of IKE_AUTH exchanges during EAP authentication
+#ifndef IKE_MAX_EAP_EXCHANGES
+   #define IKE_MAX_EAP_EXCHANGES 10
+#elif (IKE_MAX_EAP_EXCHANGES < 1)
+   #error IKE_MAX_EAP_EXCHANGES parameter is not valid
+#endif
+
 //Cookie support
 #ifndef IKE_COOKIE_SUPPORT
    #define IKE_COOKIE_SUPPORT DISABLED
 #elif (IKE_COOKIE_SUPPORT != ENABLED && IKE_COOKIE_SUPPORT != DISABLED)
    #error IKE_COOKIE_SUPPORT parameter is not valid
+#endif
+
+//Configuration payload support
+#ifndef IKE_CONFIG_PAYLOAD_SUPPORT
+   #define IKE_CONFIG_PAYLOAD_SUPPORT DISABLED
+#elif (IKE_CONFIG_PAYLOAD_SUPPORT != ENABLED && IKE_CONFIG_PAYLOAD_SUPPORT != DISABLED)
+   #error IKE_CONFIG_PAYLOAD_SUPPORT parameter is not valid
 #endif
 
 //INITIAL_CONTACT notification support
@@ -245,11 +279,11 @@
    #error IKE_MAX_ID_LEN is not valid
 #endif
 
-//Maximum length of pre-shared keys
-#ifndef IKE_MAX_PSK_LEN
-   #define IKE_MAX_PSK_LEN 64
-#elif (IKE_MAX_PSK_LEN < 0)
-   #error IKE_MAX_PSK_LEN is not valid
+//Maximum length of user name
+#ifndef IKE_MAX_USERNAME_LEN
+   #define IKE_MAX_USERNAME_LEN 32
+#elif (IKE_MAX_USERNAME_LEN < 0)
+   #error IKE_MAX_USERNAME_LEN parameter is not valid
 #endif
 
 //Maximum length of password
@@ -257,6 +291,13 @@
    #define IKE_MAX_PASSWORD_LEN 32
 #elif (IKE_MAX_PASSWORD_LEN < 0)
    #error IKE_MAX_PASSWORD_LEN parameter is not valid
+#endif
+
+//Maximum length of pre-shared keys
+#ifndef IKE_MAX_PSK_LEN
+   #define IKE_MAX_PSK_LEN 64
+#elif (IKE_MAX_PSK_LEN < 0)
+   #error IKE_MAX_PSK_LEN is not valid
 #endif
 
 //CBC cipher mode support
@@ -695,7 +736,7 @@
 
 //Minimum acceptable size for Diffie-Hellman prime modulus
 #ifndef IKE_MIN_DH_MODULUS_SIZE
-   #define IKE_MIN_DH_MODULUS_SIZE 1024
+   #define IKE_MIN_DH_MODULUS_SIZE 2048
 #elif (IKE_MIN_DH_MODULUS_SIZE < 768)
    #error IKE_MIN_DH_MODULUS_SIZE parameter is not valid
 #endif
@@ -709,7 +750,7 @@
 
 //Minimum acceptable size for RSA modulus
 #ifndef IKE_MIN_RSA_MODULUS_SIZE
-   #define IKE_MIN_RSA_MODULUS_SIZE 1024
+   #define IKE_MIN_RSA_MODULUS_SIZE 2048
 #elif (IKE_MIN_RSA_MODULUS_SIZE < 1024)
    #error IKE_MIN_RSA_MODULUS_SIZE parameter is not valid
 #endif
@@ -721,9 +762,16 @@
    #error IKE_MAX_RSA_MODULUS_SIZE parameter is not valid
 #endif
 
+//Maximum acceptable size for RSA public exponent
+#ifndef IKE_MAX_RSA_PUBLIC_EXPONENT_SIZE
+   #define IKE_MAX_RSA_PUBLIC_EXPONENT_SIZE 64
+#elif (IKE_MAX_RSA_PUBLIC_EXPONENT_SIZE < 17)
+   #error IKE_MAX_RSA_PUBLIC_EXPONENT_SIZE parameter is not valid
+#endif
+
 //Minimum acceptable size for DSA prime modulus
 #ifndef IKE_MIN_DSA_MODULUS_SIZE
-   #define IKE_MIN_DSA_MODULUS_SIZE 1024
+   #define IKE_MIN_DSA_MODULUS_SIZE 2048
 #elif (IKE_MIN_DSA_MODULUS_SIZE < 1024)
    #error IKE_MIN_DSA_MODULUS_SIZE parameter is not valid
 #endif
@@ -826,6 +874,9 @@
 #define IKE_SPI_SIZE 8
 //SHA-1 digest size
 #define IKE_SHA1_DIGEST_SIZE 20
+
+//Configuration attribute type mask
+#define IKE_CONFIG_ATTR_TYPE_MASK 0x7FFF
 
 //Forward declaration of IkeContext structure
 struct _IkeContext;
@@ -946,7 +997,7 @@ typedef enum
    IKE_TRANSFORM_TYPE_PRF    = 2,  ///<Pseudorandom Function
    IKE_TRANSFORM_TYPE_INTEG  = 3,  ///<Integrity Algorithm
    IKE_TRANSFORM_TYPE_KE     = 4,  ///<Key Exchange Method
-   IKE_TRANSFORM_TYPE_ESN    = 5,  ///<Extended Sequence Numbers
+   IKE_TRANSFORM_TYPE_SN     = 5,  ///<Sequence Numbers
    IKE_TRANSFORM_TYPE_ADDKE1 = 6,  ///<Additional Key Exchange 1
    IKE_TRANSFORM_TYPE_ADDKE2 = 7,  ///<Additional Key Exchange 2
    IKE_TRANSFORM_TYPE_ADDKE3 = 8,  ///<Additional Key Exchange 3
@@ -1078,18 +1129,19 @@ typedef enum
    IKE_TRANSFORM_ID_KE_ML_KEM_512        = 35, ///<ML-KEM-512
    IKE_TRANSFORM_ID_KE_ML_KEM_768        = 36, ///<ML-KEM-768
    IKE_TRANSFORM_ID_KE_ML_KEM_1024       = 37, ///<ML-KEM-1024
-} IkeTransformIdDhGroup;
+} IkeTransformIdKe;
 
 
 /**
- * @brief Transform IDs (Extended Sequence Numbers)
+ * @brief Transform IDs (Sequence Numbers)
  **/
 
 typedef enum
 {
-   IKE_TRANSFORM_ID_ESN_NO      = 0, ///<No Extended Sequence Numbers
-   IKE_TRANSFORM_ID_ESN_YES     = 1  ///<Extended Sequence Numbers
-} IkeTransformIdEsn;
+   IKE_TRANSFORM_ID_SN_32BIT         = 0, ///<32-bit Sequential Numbers
+   IKE_TRANSFORM_ID_SN_64BIT         = 1, ///<Partially Transmitted 64-bit Sequential Numbers
+   IKE_TRANSFORM_ID_SN_32BIT_UNSPEC  = 2  ///<32-bit Unspecified Numbers
+} IkeTransformIdSn;
 
 
 /**
@@ -1267,7 +1319,9 @@ typedef enum
    IKE_NOTIFY_MSG_TYPE_SUPPORTED_AUTH_METHODS              = 16443, //RFC 9593
    IKE_NOTIFY_MSG_TYPE_SA_RESOURCE_INFO                    = 16444, //RFC 9611
    IKE_NOTIFY_MSG_TYPE_USE_PPK_INT                         = 16445, //RFC 9867
-   IKE_NOTIFY_MSG_TYPE_PPK_IDENTITY_KEY                    = 16446  //RFC 9867
+   IKE_NOTIFY_MSG_TYPE_PPK_IDENTITY_KEY                    = 16446, //RFC 9867
+   IKE_NOTIFY_MSG_TYPE_IKE_SA_INIT_FULL_TRANSCRIPT_AUTH    = 16447, //Draft
+   IKE_NOTIFY_MSG_TYPE_CHILD_SA_PFS_INFO_SUPPORTED         = 16448  //Draft
 } IkeNotifyMsgType;
 
 
@@ -1346,6 +1400,44 @@ typedef enum
 
 
 /**
+ * @brief Hash algorithms
+ **/
+
+typedef enum
+{
+   IKE_HASH_ALGO_SHA1         = 1,
+   IKE_HASH_ALGO_SHA256       = 2,
+   IKE_HASH_ALGO_SHA384       = 3,
+   IKE_HASH_ALGO_SHA512       = 4,
+   IKE_HASH_ALGO_IDENTITY     = 5,
+   IKE_HASH_ALGO_STREEBOG_256 = 6,
+   IKE_HASH_ALGO_STREEBOG_512 = 7,
+} IkeHashAlgo;
+
+
+/**
+ * @brief Certificate types
+ **/
+
+typedef enum
+{
+   IKE_CERT_TYPE_INVALID               = 0,
+   IKE_CERT_TYPE_RSA                   = 1,
+   IKE_CERT_TYPE_RSA_PSS               = 2,
+   IKE_CERT_TYPE_DSA                   = 3,
+   IKE_CERT_TYPE_ECDSA_P256            = 4,
+   IKE_CERT_TYPE_ECDSA_P384            = 5,
+   IKE_CERT_TYPE_ECDSA_P521            = 6,
+   IKE_CERT_TYPE_ECDSA_BRAINPOOLP256R1 = 7,
+   IKE_CERT_TYPE_ECDSA_BRAINPOOLP384R1 = 8,
+   IKE_CERT_TYPE_ECDSA_BRAINPOOLP512R1 = 9,
+   IKE_CERT_TYPE_SM2                   = 10,
+   IKE_CERT_TYPE_ED25519               = 11,
+   IKE_CERT_TYPE_ED448                 = 12
+} IkeCertType;
+
+
+/**
  * @brief IKE Security Association state
  **/
 
@@ -1391,41 +1483,22 @@ typedef enum
 
 
 /**
- * @brief Hash algorithms
+ * @brief EAP state
  **/
 
 typedef enum
 {
-   IKE_HASH_ALGO_SHA1         = 1,
-   IKE_HASH_ALGO_SHA256       = 2,
-   IKE_HASH_ALGO_SHA384       = 3,
-   IKE_HASH_ALGO_SHA512       = 4,
-   IKE_HASH_ALGO_IDENTITY     = 5,
-   IKE_HASH_ALGO_STREEBOG_256 = 6,
-   IKE_HASH_ALGO_STREEBOG_512 = 7,
-} IkeHashAlgo;
-
-
-/**
- * @brief Certificate types
- **/
-
-typedef enum
-{
-   IKE_CERT_TYPE_INVALID               = 0,
-   IKE_CERT_TYPE_RSA                   = 1,
-   IKE_CERT_TYPE_RSA_PSS               = 2,
-   IKE_CERT_TYPE_DSA                   = 3,
-   IKE_CERT_TYPE_ECDSA_P256            = 4,
-   IKE_CERT_TYPE_ECDSA_P384            = 5,
-   IKE_CERT_TYPE_ECDSA_P521            = 6,
-   IKE_CERT_TYPE_ECDSA_BRAINPOOLP256R1 = 7,
-   IKE_CERT_TYPE_ECDSA_BRAINPOOLP384R1 = 8,
-   IKE_CERT_TYPE_ECDSA_BRAINPOOLP512R1 = 9,
-   IKE_CERT_TYPE_SM2                   = 10,
-   IKE_CERT_TYPE_ED25519               = 11,
-   IKE_CERT_TYPE_ED448                 = 12
-} IkeCertType;
+   IKE_EAP_STATE_DISABLED           = 0,
+   IKE_EAP_STATE_INIT               = 1,
+   IKE_EAP_STATE_IDENTITY           = 2,
+   IKE_EAP_STATE_NAK                = 3,
+   IKE_EAP_STATE_MD5_CHALLENGE      = 4,
+   IKE_EAP_STATE_MSCHAPV2_CHALLENGE = 5,
+   IKE_EAP_STATE_MSCHAPV2_SUCCESS   = 6,
+   IKE_EAP_STATE_MSCHAPV2_FAILURE   = 7,
+   IKE_EAP_STATE_SUCCESS            = 8,
+   IKE_EAP_STATE_FAILURE            = 9
+} IkeEapState;
 
 
 //CC-RX, CodeWarrior or Win32 compiler?
@@ -1768,14 +1841,6 @@ typedef __packed_struct
 
 
 /**
- * @brief Certificate verification callback function
- **/
-
-typedef error_t (*IkeCertVerifyCallback)(IkeSaEntry *sa,
-   const X509CertInfo *certInfo, uint_t pathLen);
-
-
-/**
  * @brief Cookie generation callback function
  **/
 
@@ -1791,6 +1856,27 @@ typedef error_t (*IkeCookieGenerateCallback)(IkeContext *context,
 typedef error_t (*IkeCookieVerifyCallback)(IkeContext *context,
    const IpAddr *ipAddr, const uint8_t *spi, const uint8_t *nonce,
    size_t nonceLen, const uint8_t *cookie, size_t cookieLen);
+
+
+/**
+ * @brief Certificate verification callback function
+ **/
+
+typedef error_t (*IkeCertVerifyCallback)(IkeSaEntry *sa,
+   const X509CertInfo *certInfo, uint_t pathLen);
+
+
+/**
+ * @brief Identity 
+ **/
+
+typedef struct
+{
+   uint8_t type;                 ///<Identification type
+   uint8_t reserved[3];          ///<Reserved field
+   uint8_t data[IKE_MAX_ID_LEN]; ///<Identification data
+   size_t length;                ///<Length of the identification data, in bytes
+} IkeId;
 
 
 /**
@@ -1830,6 +1916,7 @@ typedef struct
 struct _IkeSaEntry
 {
    IkeSaState state;                    ///<IKE SA state
+   IkeEapState eapState;                ///<EAP state
    IkeContext *context;                 ///<IKE context
    IkeChildSaEntry *childSa1;           ///<Child SA (created by the host)
    IkeChildSaEntry *childSa2;           ///<Child SA (created by the peer)
@@ -1867,9 +1954,7 @@ struct _IkeSaEntry
    uint8_t responderNonce[IKE_MAX_NONCE_SIZE];
    size_t responderNonceLen;
 
-   IkeIdType peerIdType;                ///<Peer ID type
-   uint8_t peerId[IKE_MAX_ID_LEN];      ///<Peer ID
-   size_t peerIdLen;                    ///<Length of the peer ID, in bytes
+   IkeId peerId;                        ///<Peer's ID
 
    IkeNotifyMsgType notifyMsgType;
    uint8_t unsupportedCriticalPayload;
@@ -1922,6 +2007,21 @@ struct _IkeSaEntry
    uint8_t response[IKE_MAX_MSG_SIZE];  ///<Response message
    size_t responseLen;                  ///<Length of the response message, in bytes
 
+#if (IKE_EAP_AUTH_SUPPORT == ENABLED)
+   uint_t eapRequestCount;              ///<Number of EAP requests received
+   uint8_t eapRequestId;                ///<EAP request identifier
+   uint8_t msk[64];                     ///<Master session key
+   size_t mskLen;                       ///<Length of the master session key, in bytes
+#endif
+#if (IKE_EAP_AUTH_SUPPORT == ENABLED && IKE_EAP_MD5_SUPPORT == ENABLED)
+   uint8_t digest[MD5_DIGEST_SIZE];     ///<Calculated hash value
+#endif
+#if (IKE_EAP_AUTH_SUPPORT == ENABLED && IKE_EAP_MSCHAPV2_SUPPORT == ENABLED)
+   uint8_t mschapv2Id;                  ///<MS-CHAPv2-ID field value
+   uint8_t peerChallenge[16];           ///<Peer challenge
+   uint8_t authChallenge[16];           ///<Authenticator challenge
+   uint8_t ntResponse[24];              ///<NT-Response
+#endif
 #if (IKE_CREATE_CHILD_SA_SUPPORT == ENABLED)
    bool_t rekeyRequest;                 ///<IKE SA rekey request
 #endif
@@ -1939,8 +2039,10 @@ struct _IkeSaEntry
    uint32_t signHashAlgos;              ///<List of hash algorithms supported by the peer
 #endif
 #if (IKE_NAT_TRAVERSAL_SUPPORT == ENABLED)
-   bool_t natDetectSrcIp;               ///<NAT_DETECTION_SOURCE_IP notification received
-   bool_t natDetectDestIp;              ///<NAT_DETECTION_DESTINATION_IP notification received
+   uint8_t natDetectSrcIpDigest[20];    ///<NAT_DETECTION_SOURCE_IP notification data
+   uint8_t natDetectDestIpDigest[20];   ///<NAT_DETECTION_DESTINATION_IP notification data
+   bool_t natDetectSrcIpReceived;       ///<NAT_DETECTION_SOURCE_IP notification received
+   bool_t natDetectDestIpReceived;      ///<NAT_DETECTION_DESTINATION_IP notification received
    bool_t localNat;                     ///<The local host is behind a NAT
    bool_t remoteNat;                    ///<The remote host is behind a NAT
    systime_t natKeepAliveTimestamp;     ///<Timestamp to manage NAT keepalive transmission
@@ -1961,6 +2063,7 @@ struct _IkeChildSaEntry
    IpAddr remoteIpAddr;                ///<IP address of the peer
    IpsecMode mode;                     ///<IPsec mode (tunnel or transport)
    IpsecProtocol protocol;             ///<Security protocol (AH or ESP)
+   bool_t esn;                         ///<Use extended sequence numbers
    bool_t initiator;                   ///<Initiator of the CREATE_CHILD_SA exchange
    systime_t lifetimeStart;
 
@@ -1974,7 +2077,7 @@ struct _IkeChildSaEntry
 
    uint16_t encAlgoId;                 ///<Encryption algorithm
    uint16_t authAlgoId;                ///<Integrity algorithm
-   uint16_t esn;                       ///<Extended sequence numbers
+   uint16_t snId;                      ///<SN transform
    uint8_t acceptedProposalNum;        ///<Number of the accepted proposal
 
 #if (IKE_CHILD_SA_PFS_SUPPORT == ENABLED)
@@ -2076,17 +2179,25 @@ struct _IkeContext
    systime_t dpdPeriod;                       ///<Dead peer detection period
 #endif
    uint16_t preferredGroupNum;                ///<Preferred key exchange method
-   IkeIdType idType;                          ///<ID type
-   uint8_t id[IKE_MAX_ID_LEN];                ///<ID
-   size_t idLen;                              ///<Length of the ID, in bytes
-   uint8_t psk[IKE_MAX_PSK_LEN];              ///<Pre-shared key
-   size_t pskLen;                             ///<Length of the pre-shared key, in bytes
+   IkeId id;                                  ///<Entity's ID
+
+   IpsecAuthMethod authMethod;                ///<Authentication method
+#if (IKE_CERT_AUTH_SUPPORT == ENABLED)
    IkeCertType certType;                      ///<Certificate type
    const char_t *certChain;                   ///<Entity's certificate chain (PEM format)
    size_t certChainLen;                       ///<Length of the certificate chain
    const char_t *privateKey;                  ///<Entity's private key (PEM format)
    size_t privateKeyLen;                      ///<Length of the private key
-   char_t password[IKE_MAX_PASSWORD_LEN + 1]; ///<Password used to decrypt the private key
+   char_t privateKeyPassword[IKE_MAX_PASSWORD_LEN + 1]; ///<Password used to decrypt the private key
+#endif
+#if (IKE_PSK_AUTH_SUPPORT == ENABLED)
+   uint8_t psk[IKE_MAX_PSK_LEN];              ///<Pre-shared key
+   size_t pskLen;                             ///<Length of the pre-shared key, in bytes
+#endif
+#if (IKE_EAP_AUTH_SUPPORT == ENABLED)
+   char_t username[IKE_MAX_USERNAME_LEN + 1]; ///<User name
+   char_t password[IKE_MAX_PASSWORD_LEN + 1]; ///<Password
+#endif
 
    Socket *socket;                            ///<Underlying UDP socket (port 500)
 #if (IKE_NAT_TRAVERSAL_SUPPORT == ENABLED)
@@ -2129,11 +2240,19 @@ error_t ikeSetPreferredGroup(IkeContext *context, uint16_t groupNum);
 error_t ikeSetId(IkeContext *context, IkeIdType idType, const void *id,
    size_t idLen);
 
-error_t ikeSetPsk(IkeContext *context, const uint8_t *psk, size_t pskLen);
+error_t ikeSetAuthMethod(IkeContext *context, IpsecAuthMethod authMethod);
 
 error_t ikeSetCertificate(IkeContext *context, const char_t *certChain,
    size_t certChainLen, const char_t *privateKey, size_t privateKeyLen,
    const char_t *password);
+
+error_t ikeSetPsk(IkeContext *context, const uint8_t *psk, size_t pskLen);
+
+error_t ikeSetUsername(IkeContext *context, const char_t *username);
+error_t ikeSetPassword(IkeContext *context, const char_t *password);
+
+error_t ikeRequestConfigAttribute(IkeContext *context, IkeConfigAttrType type,
+   bool_t enable);
 
 error_t ikeCreateSa(IkeContext *context, const IpAddr *remoteIpAddr);
 error_t ikeRekeySa(IkeSaEntry *sa);

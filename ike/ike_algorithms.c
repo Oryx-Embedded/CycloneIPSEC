@@ -465,7 +465,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_CCM;
       sa->cipherAlgo = AES_CIPHER_ALGO;
       sa->encKeyLen = 16;
-      sa->authKeyLen = 0;
       sa->saltLen = 3;
       sa->ivLen = 8;
       sa->icvLen = 8;
@@ -479,7 +478,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_CCM;
       sa->cipherAlgo = AES_CIPHER_ALGO;
       sa->encKeyLen = 24;
-      sa->authKeyLen = 0;
       sa->saltLen = 3;
       sa->ivLen = 8;
       sa->icvLen = 8;
@@ -493,7 +491,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_CCM;
       sa->cipherAlgo = AES_CIPHER_ALGO;
       sa->encKeyLen = 32;
-      sa->authKeyLen = 0;
       sa->saltLen = 3;
       sa->ivLen = 8;
       sa->icvLen = 8;
@@ -507,7 +504,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_CCM;
       sa->cipherAlgo = AES_CIPHER_ALGO;
       sa->encKeyLen = 16;
-      sa->authKeyLen = 0;
       sa->saltLen = 3;
       sa->ivLen = 8;
       sa->icvLen = 12;
@@ -521,7 +517,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_CCM;
       sa->cipherAlgo = AES_CIPHER_ALGO;
       sa->encKeyLen = 24;
-      sa->authKeyLen = 0;
       sa->saltLen = 3;
       sa->ivLen = 8;
       sa->icvLen = 12;
@@ -535,7 +530,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_CCM;
       sa->cipherAlgo = AES_CIPHER_ALGO;
       sa->encKeyLen = 32;
-      sa->authKeyLen = 0;
       sa->saltLen = 3;
       sa->ivLen = 8;
       sa->icvLen = 12;
@@ -549,7 +543,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_CCM;
       sa->cipherAlgo = AES_CIPHER_ALGO;
       sa->encKeyLen = 16;
-      sa->authKeyLen = 0;
       sa->saltLen = 3;
       sa->ivLen = 8;
       sa->icvLen = 16;
@@ -563,7 +556,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_CCM;
       sa->cipherAlgo = AES_CIPHER_ALGO;
       sa->encKeyLen = 24;
-      sa->authKeyLen = 0;
       sa->saltLen = 3;
       sa->ivLen = 8;
       sa->icvLen = 16;
@@ -577,7 +569,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_CCM;
       sa->cipherAlgo = AES_CIPHER_ALGO;
       sa->encKeyLen = 32;
-      sa->authKeyLen = 0;
       sa->saltLen = 3;
       sa->ivLen = 8;
       sa->icvLen = 16;
@@ -591,7 +582,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_GCM;
       sa->cipherAlgo = AES_CIPHER_ALGO;
       sa->encKeyLen = 16;
-      sa->authKeyLen = 0;
       sa->saltLen = 4;
       sa->ivLen = 8;
       sa->icvLen = 8;
@@ -605,7 +595,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_GCM;
       sa->cipherAlgo = AES_CIPHER_ALGO;
       sa->encKeyLen = 24;
-      sa->authKeyLen = 0;
       sa->saltLen = 4;
       sa->ivLen = 8;
       sa->icvLen = 8;
@@ -619,7 +608,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_GCM;
       sa->cipherAlgo = AES_CIPHER_ALGO;
       sa->encKeyLen = 32;
-      sa->authKeyLen = 0;
       sa->saltLen = 4;
       sa->ivLen = 8;
       sa->icvLen = 8;
@@ -633,7 +621,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_GCM;
       sa->cipherAlgo = AES_CIPHER_ALGO;
       sa->encKeyLen = 16;
-      sa->authKeyLen = 0;
       sa->saltLen = 4;
       sa->ivLen = 8;
       sa->icvLen = 12;
@@ -647,7 +634,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_GCM;
       sa->cipherAlgo = AES_CIPHER_ALGO;
       sa->encKeyLen = 24;
-      sa->authKeyLen = 0;
       sa->saltLen = 4;
       sa->ivLen = 8;
       sa->icvLen = 12;
@@ -661,7 +647,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_GCM;
       sa->cipherAlgo = AES_CIPHER_ALGO;
       sa->encKeyLen = 32;
-      sa->authKeyLen = 0;
       sa->saltLen = 4;
       sa->ivLen = 8;
       sa->icvLen = 12;
@@ -675,7 +660,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_GCM;
       sa->cipherAlgo = AES_CIPHER_ALGO;
       sa->encKeyLen = 16;
-      sa->authKeyLen = 0;
       sa->saltLen = 4;
       sa->ivLen = 8;
       sa->icvLen = 16;
@@ -689,7 +673,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_GCM;
       sa->cipherAlgo = AES_CIPHER_ALGO;
       sa->encKeyLen = 24;
-      sa->authKeyLen = 0;
       sa->saltLen = 4;
       sa->ivLen = 8;
       sa->icvLen = 16;
@@ -703,7 +686,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_GCM;
       sa->cipherAlgo = AES_CIPHER_ALGO;
       sa->encKeyLen = 32;
-      sa->authKeyLen = 0;
       sa->saltLen = 4;
       sa->ivLen = 8;
       sa->icvLen = 16;
@@ -786,7 +768,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_CCM;
       sa->cipherAlgo = CAMELLIA_CIPHER_ALGO;
       sa->encKeyLen = 16;
-      sa->authKeyLen = 0;
       sa->saltLen = 3;
       sa->ivLen = 8;
       sa->icvLen = 8;
@@ -800,7 +781,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_CCM;
       sa->cipherAlgo = CAMELLIA_CIPHER_ALGO;
       sa->encKeyLen = 24;
-      sa->authKeyLen = 0;
       sa->saltLen = 3;
       sa->ivLen = 8;
       sa->icvLen = 8;
@@ -814,7 +794,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_CCM;
       sa->cipherAlgo = CAMELLIA_CIPHER_ALGO;
       sa->encKeyLen = 32;
-      sa->authKeyLen = 0;
       sa->saltLen = 3;
       sa->ivLen = 8;
       sa->icvLen = 8;
@@ -828,7 +807,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_CCM;
       sa->cipherAlgo = CAMELLIA_CIPHER_ALGO;
       sa->encKeyLen = 16;
-      sa->authKeyLen = 0;
       sa->saltLen = 3;
       sa->ivLen = 8;
       sa->icvLen = 12;
@@ -842,7 +820,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_CCM;
       sa->cipherAlgo = CAMELLIA_CIPHER_ALGO;
       sa->encKeyLen = 24;
-      sa->authKeyLen = 0;
       sa->saltLen = 3;
       sa->ivLen = 8;
       sa->icvLen = 12;
@@ -856,7 +833,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_CCM;
       sa->cipherAlgo = CAMELLIA_CIPHER_ALGO;
       sa->encKeyLen = 32;
-      sa->authKeyLen = 0;
       sa->saltLen = 3;
       sa->ivLen = 8;
       sa->icvLen = 12;
@@ -870,7 +846,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_CCM;
       sa->cipherAlgo = CAMELLIA_CIPHER_ALGO;
       sa->encKeyLen = 16;
-      sa->authKeyLen = 0;
       sa->saltLen = 3;
       sa->ivLen = 8;
       sa->icvLen = 16;
@@ -884,7 +859,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_CCM;
       sa->cipherAlgo = CAMELLIA_CIPHER_ALGO;
       sa->encKeyLen = 24;
-      sa->authKeyLen = 0;
       sa->saltLen = 3;
       sa->ivLen = 8;
       sa->icvLen = 16;
@@ -898,7 +872,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_CCM;
       sa->cipherAlgo = CAMELLIA_CIPHER_ALGO;
       sa->encKeyLen = 32;
-      sa->authKeyLen = 0;
       sa->saltLen = 3;
       sa->ivLen = 8;
       sa->icvLen = 16;
@@ -912,7 +885,6 @@ error_t ikeSelectEncAlgo(IkeSaEntry *sa, uint16_t encAlgoId,
       sa->cipherMode = CIPHER_MODE_CHACHA20_POLY1305;
       sa->cipherAlgo = NULL;
       sa->encKeyLen = 32;
-      sa->authKeyLen = 0;
       sa->saltLen = 4;
       sa->ivLen = 8;
       sa->icvLen = 16;
@@ -949,7 +921,6 @@ error_t ikeSelectAuthAlgo(IkeSaEntry *sa, uint16_t authAlgoId)
    if(authAlgoId == IKE_TRANSFORM_ID_AUTH_AES_CMAC_96)
    {
       sa->authMacAlgo = MAC_ALGO_CMAC;
-      sa->authHashAlgo = NULL;
       sa->authCipherAlgo = AES_CIPHER_ALGO;
       sa->authKeyLen = 16;
       sa->icvLen = 12;
@@ -962,7 +933,6 @@ error_t ikeSelectAuthAlgo(IkeSaEntry *sa, uint16_t authAlgoId)
    {
       sa->authMacAlgo = MAC_ALGO_HMAC;
       sa->authHashAlgo = MD5_HASH_ALGO;
-      sa->authCipherAlgo = NULL;
       sa->authKeyLen = MD5_DIGEST_SIZE;
       sa->icvLen = 12;
    }
@@ -974,7 +944,6 @@ error_t ikeSelectAuthAlgo(IkeSaEntry *sa, uint16_t authAlgoId)
    {
       sa->authMacAlgo = MAC_ALGO_HMAC;
       sa->authHashAlgo = SHA1_HASH_ALGO;
-      sa->authCipherAlgo = NULL;
       sa->authKeyLen = SHA1_DIGEST_SIZE;
       sa->icvLen = 12;
    }
@@ -986,7 +955,6 @@ error_t ikeSelectAuthAlgo(IkeSaEntry *sa, uint16_t authAlgoId)
    {
       sa->authMacAlgo = MAC_ALGO_HMAC;
       sa->authHashAlgo = SHA256_HASH_ALGO;
-      sa->authCipherAlgo = NULL;
       sa->authKeyLen = SHA256_DIGEST_SIZE;
       sa->icvLen = 16;
    }
@@ -998,7 +966,6 @@ error_t ikeSelectAuthAlgo(IkeSaEntry *sa, uint16_t authAlgoId)
    {
       sa->authMacAlgo = MAC_ALGO_HMAC;
       sa->authHashAlgo = SHA384_HASH_ALGO;
-      sa->authCipherAlgo = NULL;
       sa->authKeyLen = SHA384_DIGEST_SIZE;
       sa->icvLen = 24;
    }
@@ -1010,7 +977,6 @@ error_t ikeSelectAuthAlgo(IkeSaEntry *sa, uint16_t authAlgoId)
    {
       sa->authMacAlgo = MAC_ALGO_HMAC;
       sa->authHashAlgo = SHA512_HASH_ALGO;
-      sa->authCipherAlgo = NULL;
       sa->authKeyLen = SHA512_DIGEST_SIZE;
       sa->icvLen = 32;
    }
@@ -1021,7 +987,6 @@ error_t ikeSelectAuthAlgo(IkeSaEntry *sa, uint16_t authAlgoId)
    if(authAlgoId == IKE_TRANSFORM_ID_AUTH_AES_XCBC_96)
    {
       sa->authMacAlgo = MAC_ALGO_XCBC_MAC;
-      sa->authHashAlgo = NULL;
       sa->authCipherAlgo = AES_CIPHER_ALGO;
       sa->authKeyLen = 16;
       sa->icvLen = 12;
@@ -1058,7 +1023,6 @@ error_t ikeSelectPrfAlgo(IkeSaEntry *sa, uint16_t prfAlgoId)
    if(prfAlgoId == IKE_TRANSFORM_ID_PRF_AES128_CMAC)
    {
       sa->prfMacAlgo = MAC_ALGO_CMAC;
-      sa->prfHashAlgo = NULL;
       sa->prfCipherAlgo = AES_CIPHER_ALGO;
       sa->prfKeyLen = 16;
    }
@@ -1070,7 +1034,6 @@ error_t ikeSelectPrfAlgo(IkeSaEntry *sa, uint16_t prfAlgoId)
    {
       sa->prfMacAlgo = MAC_ALGO_HMAC;
       sa->prfHashAlgo = MD5_HASH_ALGO;
-      sa->prfCipherAlgo = NULL;
       sa->prfKeyLen = MD5_DIGEST_SIZE;
    }
    else
@@ -1081,7 +1044,6 @@ error_t ikeSelectPrfAlgo(IkeSaEntry *sa, uint16_t prfAlgoId)
    {
       sa->prfMacAlgo = MAC_ALGO_HMAC;
       sa->prfHashAlgo = SHA1_HASH_ALGO;
-      sa->prfCipherAlgo = NULL;
       sa->prfKeyLen = SHA1_DIGEST_SIZE;
    }
    else
@@ -1092,7 +1054,6 @@ error_t ikeSelectPrfAlgo(IkeSaEntry *sa, uint16_t prfAlgoId)
    {
       sa->prfMacAlgo = MAC_ALGO_HMAC;
       sa->prfHashAlgo = SHA256_HASH_ALGO;
-      sa->prfCipherAlgo = NULL;
       sa->prfKeyLen = SHA256_DIGEST_SIZE;
    }
    else
@@ -1103,7 +1064,6 @@ error_t ikeSelectPrfAlgo(IkeSaEntry *sa, uint16_t prfAlgoId)
    {
       sa->prfMacAlgo = MAC_ALGO_HMAC;
       sa->prfHashAlgo = SHA384_HASH_ALGO;
-      sa->prfCipherAlgo = NULL;
       sa->prfKeyLen = SHA384_DIGEST_SIZE;
    }
    else
@@ -1114,7 +1074,6 @@ error_t ikeSelectPrfAlgo(IkeSaEntry *sa, uint16_t prfAlgoId)
    {
       sa->prfMacAlgo = MAC_ALGO_HMAC;
       sa->prfHashAlgo = SHA512_HASH_ALGO;
-      sa->prfCipherAlgo = NULL;
       sa->prfKeyLen = SHA512_DIGEST_SIZE;
    }
    else
@@ -1125,7 +1084,6 @@ error_t ikeSelectPrfAlgo(IkeSaEntry *sa, uint16_t prfAlgoId)
    {
       sa->prfMacAlgo = MAC_ALGO_HMAC;
       sa->prfHashAlgo = TIGER_HASH_ALGO;
-      sa->prfCipherAlgo = NULL;
       sa->prfKeyLen = TIGER_DIGEST_SIZE;
    }
    else
@@ -1135,7 +1093,6 @@ error_t ikeSelectPrfAlgo(IkeSaEntry *sa, uint16_t prfAlgoId)
    if(prfAlgoId == IKE_TRANSFORM_ID_PRF_AES128_XCBC)
    {
       sa->prfMacAlgo = MAC_ALGO_XCBC_MAC;
-      sa->prfHashAlgo = NULL;
       sa->prfCipherAlgo = AES_CIPHER_ALGO;
       sa->prfKeyLen = 16;
    }
@@ -1470,6 +1427,107 @@ uint_t ikeGetNumTransforms(IkeTransformType transformType,
 
 
 /**
+ * @brief Search a proposal for a given transform
+ * @param[in] transformType Transform type
+ * @param[in] transformId Transform identifier
+ * @param[in] keyLen Length of the key, in bits
+ * @param[in] algoList List of algorithms
+ * @param[in] proposal Pointer to the Proposal substructure
+ * @param[in] proposalLen Length of the Proposal substructure, in bytes
+ * @return TRUE is the specified transform has been found, else FALSE
+ **/
+
+bool_t ikeFindTranform(IkeTransformType transformType, uint16_t transformId,
+   uint_t keyLen, const IkeProposal *proposal, size_t proposalLen)
+{
+   uint_t i;
+   size_t n;
+   bool_t found;
+   size_t length;
+   const uint8_t *p;
+   const IkeTransform *transform;
+   const IkeTransformAttr *attr;
+
+   //Initialize flag
+   found = FALSE;
+
+   //Check the length of the Proposal substructure
+   if(proposalLen >= sizeof(IkeProposal) &&
+      proposalLen >= (sizeof(IkeProposal) + proposal->spiSize))
+   {
+      //Point to the list of transforms
+      p = (uint8_t *) proposal + sizeof(IkeProposal) + proposal->spiSize;
+      length = proposalLen - sizeof(IkeProposal) - proposal->spiSize;
+
+      //Loop through the list of transforms
+      for(i = 0; i < proposal->numTransforms && !found; i++)
+      {
+         //Malformed substructure?
+         if(length < sizeof(IkeTransform))
+            break;
+
+         //Point to the Transform substructure
+         transform = (IkeTransform *) p;
+
+         //The Transform Length field indicates the length of the Transform
+         //substructure including header and attributes
+         n = ntohs(transform->transformLength);
+
+         //Check the length of the transform
+         if(n < sizeof(IkeTransform) || n > length)
+            break;
+
+         //Matching transform?
+         if(transform->transformType == transformType &&
+            ntohs(transform->transformId) == transformId)
+         {
+            //Variable-length key encryption algorithm?
+            if(transform->transformType == IKE_TRANSFORM_TYPE_ENCR &&
+               ikeIsVariableLengthKeyEncAlgo(transformId))
+            {
+               //For algorithms that accept a variable-length key, a fixed key
+               //size must be specified as part of the cryptographic transform
+               //negotiated (refer to RFC 7296, section 2.13)
+               if(n == (sizeof(IkeTransform) + sizeof(IkeTransformAttr)))
+               {
+                  //Point to the transform attribute
+                  attr = (IkeTransformAttr *) transform->transformAttr;
+
+                  //Check attribute format and type
+                  if(ntohs(attr->type) == ((uint16_t) IKE_ATTR_FORMAT_TV |
+                     (uint16_t) IKE_TRANSFORM_ATTR_TYPE_KEY_LEN))
+                  {
+                     //Matching key length?
+                     if(ntohs(attr->length) == keyLen)
+                     {
+                        found = TRUE;
+                     }
+                  }
+               }
+            }
+            else
+            {
+               found = TRUE;
+            }
+         }
+
+         //The Last Substruc field has a value of 0 if this was the last
+         //Transform Substructure
+         if(transform->lastSubstruc == IKE_LAST_SUBSTRUC_LAST)
+            break;
+
+         //Jump to the next Transform substructure
+         p += n;
+         length -= n;
+      }
+   }
+
+   //Return TRUE if the specified transform was found
+   return found;
+}
+
+
+/**
  * @brief Transform negotiation
  * @param[in] transformType Transform type
  * @param[in] algoList List of algorithms
@@ -1484,16 +1542,7 @@ uint16_t ikeSelectTransform(IkeTransformType transformType,
    size_t proposalLen)
 {
    uint_t i;
-   uint_t j;
-   size_t n;
-   size_t length;
-   bool_t found;
-   const uint8_t *p;
    uint16_t selectedAlgo;
-   IkeTransform *transform;
-
-   //Initialize flag
-   found = FALSE;
 
    //Key exchange transform negotiation?
    if(transformType == IKE_TRANSFORM_TYPE_KE)
@@ -1505,56 +1554,15 @@ uint16_t ikeSelectTransform(IkeTransformType transformType,
       selectedAlgo = IKE_TRANSFORM_ID_INVALID;
    }
 
-   //Check the length of the Proposal substructure
-   if(proposalLen >= sizeof(IkeProposal) &&
-      proposalLen >= (sizeof(IkeProposal) + proposal->spiSize))
+   //Loop through the list of algorithms supported by the entity
+   for(i = 0; i < algoListLen; i++)
    {
-      //Loop through the list of algorithms supported by the entity
-      for(i = 0; i < algoListLen && !found; i++)
+      //Search the list of algorithms supported by the peer for a matching
+      //transform
+      if(ikeFindTranform(transformType, algoList[i], 0, proposal, proposalLen))
       {
-         //Get the length of the Proposal substructure
-         length = proposalLen - sizeof(IkeProposal) - proposal->spiSize;
-         //Point to the first Transform substructure
-         p = (uint8_t *) proposal + sizeof(IkeProposal) + proposal->spiSize;
-
-         //Loop through the list of algorithms supported by the peer
-         for(j = 0; j < proposal->numTransforms && !found; j++)
-         {
-            //Malformed substructure?
-            if(length < sizeof(IkeTransform))
-               break;
-
-            //Point to the Transform substructure
-            transform = (IkeTransform *) p;
-
-            //The Transform Length field indicates the length of the Transform
-            //substructure including header and attributes
-            n = ntohs(transform->transformLength);
-
-            //Check the length of the transform
-            if(n < sizeof(IkeTransform) || n > length)
-               break;
-
-            //Check transform type
-            if(transform->transformType == transformType)
-            {
-               //Check transform identifier
-               if(ntohs(transform->transformId) == algoList[i])
-               {
-                  selectedAlgo = algoList[i];
-                  found = TRUE;
-               }
-            }
-
-            //The Last Substruc field has a value of 0 if this was the last
-            //Transform Substructure
-            if(transform->lastSubstruc == IKE_LAST_SUBSTRUC_LAST)
-               break;
-
-            //Jump to the next Transform substructure
-            p += n;
-            length -= n;
-         }
+         selectedAlgo = algoList[i];
+         break;
       }
    }
 
@@ -1592,102 +1600,21 @@ const IkeEncAlgo *ikeSelectEncTransform(IkeContext *context,
    const IkeProposal *proposal, size_t proposalLen)
 {
    uint_t i;
-   uint_t j;
-   size_t n;
-   size_t length;
-   uint8_t *p;
-   uint16_t transformId;
    const IkeEncAlgo *selectedAlgo;
-   const IkeTransform *transform;
-   const IkeTransformAttr *attr;
 
    //Chosen algorithm
    selectedAlgo = NULL;
 
-   //Check the length of the Proposal substructure
-   if(proposalLen >= sizeof(IkeProposal) &&
-      proposalLen >= (sizeof(IkeProposal) + proposal->spiSize))
+   //Loop through the list of algorithms supported by the entity
+   for(i = 0; i < arraysize(ikeSupportedEncAlgos); i++)
    {
-      //Loop through the list of algorithms supported by the entity
-      for(i = 0; i < arraysize(ikeSupportedEncAlgos) && selectedAlgo == NULL; i++)
+      //Search the list of algorithms supported by the peer for a matching
+      //transform
+      if(ikeFindTranform(IKE_TRANSFORM_TYPE_ENCR, ikeSupportedEncAlgos[i].id,
+         ikeSupportedEncAlgos[i].keyLen * 8, proposal, proposalLen))
       {
-         //Get the length of the Proposal substructure
-         length = proposalLen - sizeof(IkeProposal) - proposal->spiSize;
-         //Point to the first Transform substructure
-         p = (uint8_t *) proposal + sizeof(IkeProposal) + proposal->spiSize;
-
-         //Loop through the list of algorithms supported by the peer
-         for(j = 0; j < proposal->numTransforms && selectedAlgo == NULL; j++)
-         {
-            //Malformed substructure?
-            if(length < sizeof(IkeTransform))
-               break;
-
-            //Point to the Transform substructure
-            transform = (IkeTransform *) p;
-
-            //The Transform Length field indicates the length of the Transform
-            //substructure including header and attributes
-            n = ntohs(transform->transformLength);
-
-            //Check the length of the transform
-            if(n < sizeof(IkeTransform) || n > length)
-               break;
-
-            //Check transform type
-            if(transform->transformType == IKE_TRANSFORM_TYPE_ENCR)
-            {
-               //Convert the Transform ID field to host byte order
-               transformId = ntohs(transform->transformId);
-
-               //Variable-length key encryption algorithm?
-               if(ikeIsVariableLengthKeyEncAlgo(transformId))
-               {
-                  //For algorithms that accept a variable-length key, a fixed
-                  //key size must be specified as part of the cryptographic
-                  //transform negotiated (refer to RFC 7296, section 2.13)
-                  if(n == (sizeof(IkeTransform) + sizeof(IkeTransformAttr)))
-                  {
-                     //Point to the transform attribute
-                     attr = (IkeTransformAttr *) transform->transformAttr;
-
-                     //Check attribute format and type
-                     if(ntohs(attr->type) == ((uint16_t) IKE_ATTR_FORMAT_TV |
-                        (uint16_t) IKE_TRANSFORM_ATTR_TYPE_KEY_LEN))
-                     {
-                        //Check transform identifier and key length
-                        if(transformId == ikeSupportedEncAlgos[i].id &&
-                           ntohs(attr->length) == (ikeSupportedEncAlgos[i].keyLen * 8))
-                        {
-                           selectedAlgo = &ikeSupportedEncAlgos[i];
-                        }
-                     }
-                  }
-               }
-               else
-               {
-                  //The Key Length attribute must not be used with transforms
-                  //that use a fixed-length key (refer to RFC 7296, section 3.3.5)
-                  if(n == sizeof(IkeTransform))
-                  {
-                     //Check transform identifier
-                     if(transformId == ikeSupportedEncAlgos[i].id)
-                     {
-                        selectedAlgo = &ikeSupportedEncAlgos[i];
-                     }
-                  }
-               }
-            }
-
-            //The Last Substruc field has a value of 0 if this was the last
-            //Transform Substructure
-            if(transform->lastSubstruc == IKE_LAST_SUBSTRUC_LAST)
-               break;
-
-            //Jump to the next Transform substructure
-            p += n;
-            length -= n;
-         }
+         selectedAlgo = &ikeSupportedEncAlgos[i];
+         break;
       }
    }
 

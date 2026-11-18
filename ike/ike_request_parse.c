@@ -135,12 +135,6 @@ error_t ikeParseIkeSaInitRequest(IkeContext *context, const uint8_t *message,
    //Save initiator's IKE SPI
    osMemcpy(sa->initiatorSpi, ikeHeader->initiatorSpi, IKE_SPI_SIZE);
 
-   //Save the first message (IKE_SA_INIT request), starting with the first
-   //octet of the first SPI in the header and ending with the last octet of
-   //the last payload
-   sa->initiatorSaInit = message;
-   sa->initiatorSaInitLen = length;
-
    //Start of exception handling block
    do
    {
@@ -368,6 +362,13 @@ error_t ikeParseIkeSaInitRequest(IkeContext *context, const uint8_t *message,
       }
 #endif
 
+      //Save the first message (IKE_SA_INIT request), starting with the first
+      //octet of the first SPI in the header and ending with the last octet of
+      //the last payload
+      osMemcpy(sa->request, message, length);
+      sa->initiatorSaInit = sa->request;
+      sa->initiatorSaInitLen = length;
+
       //End of exception handling block
    } while(0);
 
@@ -388,12 +389,8 @@ error_t ikeParseIkeAuthRequest(IkeSaEntry *sa, const uint8_t *message,
    size_t length)
 {
    error_t error;
-   IkeChildSaEntry *childSa;
    IpsecPadEntry *padEntry;
    IkeMessagePayloads payloads;
-
-   //Initialize Child SA
-   childSa = NULL;
 
    //Check the state of the IKE SA
    if(sa->state != IKE_SA_STATE_AUTH_REQ)
@@ -443,18 +440,9 @@ error_t ikeParseIkeAuthRequest(IkeSaEntry *sa, const uint8_t *message,
          break;
       }
 
-#if (IKE_NAT_TRAVERSAL_SUPPORT == ENABLED)
-      //Check if the remote endpoint is behind a NAT
-      if(sa->remoteNat)
-      {
-         //Perform ID substitution
-         ikeSubstituteId(sa);
-      }
-#endif
-
       //Perform lookup in the PAD database based on the ID
       padEntry = ipsecFindPadEntry(sa->context->netContext->ipsecContext,
-         sa->peerIdType, sa->peerId, sa->peerIdLen);
+         sa->peerId.type, sa->peerId.data, sa->peerId.length);
 
       //All errors causing the authentication to fail for whatever reason
       //(invalid shared secret, invalid ID, untrusted certificate issuer,
@@ -467,8 +455,8 @@ error_t ikeParseIkeAuthRequest(IkeSaEntry *sa, const uint8_t *message,
       }
 
 #if (IKE_CERT_AUTH_SUPPORT == ENABLED)
-      //Check whether a Certificate payload is included
-      if(payloads.cert != NULL)
+      //Certificate-based authentication?
+      if(padEntry->authMethod == IPSEC_AUTH_METHOD_CERT)
       {
          //Parse the certificate chain
          error = ikeParseCertificateChain(sa, padEntry, message, length);
@@ -482,11 +470,9 @@ error_t ikeParseIkeAuthRequest(IkeSaEntry *sa, const uint8_t *message,
       }
 #endif
 
-      //The peers are authenticated by having each sign (or MAC using a padded
-      //shared secret as the key, as described later in this section) a block
-      //of data (refer to RFC 7296, section 2.15)
-      error = ikeVerifyAuth(sa, padEntry, payloads.idi, payloads.cert,
-         payloads.auth);
+      //The peers are authenticated by having each sign (or MAC using a shared
+      //secret as the key) a block of data (refer to RFC 7296, section 2.15)
+      error = ikeParseAuthPayload(sa, payloads.auth, payloads.cert);
 
       //Authentication failure?
       if(error)
@@ -909,6 +895,7 @@ void ikeProcessChildSaCreateRequest(IkeSaEntry *sa, IkeChildSaEntry *oldChildSa,
       childSa->sa = sa;
       childSa->oldChildSa = oldChildSa;
       childSa->mode = IPSEC_MODE_TUNNEL;
+      childSa->esn = FALSE;
       childSa->initiator = FALSE;
 
       //The KEi payload is optional

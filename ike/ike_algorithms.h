@@ -82,6 +82,9 @@ error_t ikeAddSupportedPrfTransforms(IkeContext *context,
 uint_t ikeGetNumTransforms(IkeTransformType transformType,
    const IkeProposal *proposal, size_t proposalLen);
 
+bool_t ikeFindTranform(IkeTransformType transformType, uint16_t transformId,
+   uint_t keyLen, const IkeProposal *proposal, size_t proposalLen);
+
 uint16_t ikeSelectTransform(IkeTransformType transformType,
    const uint16_t *algoList, uint_t algoListLen, const IkeProposal *proposal,
    size_t proposalLen);

@@ -258,7 +258,7 @@ IpsecPadEntry *ipsecFindPadEntry(IpsecContext *context, uint8_t idType,
    IpsecPadEntry *entry;
 
    //Valid parameters
-   if(context != NULL && id != NULL)
+   if(context != NULL && id != NULL && idLen > 0)
    {
       //Loop through PAD entries
       for(i = 0; i < context->numPadEntries; i++)
@@ -266,30 +266,64 @@ IpsecPadEntry *ipsecFindPadEntry(IpsecContext *context, uint8_t idType,
          //Point to the current PAD entry
          entry = &context->pad[i];
 
-         //Valid authentication method and ID type?
-         if(entry->authMethod == IPSEC_AUTH_METHOD_IKEV2 &&
-            entry->idType == idType)
+         //Valid PAD entry?
+         if(entry->idType == idType &&
+            entry->authProtocol == IPSEC_AUTH_PROTOCOL_IKEV2 &&
+            entry->authMethod != IPSEC_AUTH_METHOD_INVALID)
          {
             //Fully-qualified domain name?
             if(idType == IPSEC_ID_TYPE_FQDN)
             {
-               //Compare DNS names
-               if(idLen == entry->idLen &&
-                  osMemcmp(id, entry->id.fqdn, idLen) == 0)
+               //Sub-tree matching or exact match?
+               if(entry->id.fqdn[0] == '.')
                {
-                  //A matching PAD entry has been found
-                  return entry;
+                  //A domain name may encompass a group of peers by being
+                  //partially specified
+                  if(idLen > entry->idLen &&
+                     osMemcmp(id + idLen - entry->idLen, entry->id.fqdn,
+                     entry->idLen) == 0)
+                  {
+                     //A matching PAD entry has been found
+                     return entry;
+                  }
+               }
+               else
+               {
+                  //A domain name may be fully qualified and thus match exactly
+                  //one name
+                  if(idLen == entry->idLen &&
+                     osMemcmp(id, entry->id.fqdn, entry->idLen) == 0)
+                  {
+                     //A matching PAD entry has been found
+                     return entry;
+                  }
                }
             }
             //RFC 822 email address?
             else if(idType == IPSEC_ID_TYPE_RFC822_ADDR)
             {
-               //Compare email addresses
-               if(idLen == entry->idLen &&
-                  osMemcmp(id, entry->id.email, idLen) == 0)
+               //Sub-tree matching or exact match?
+               if(entry->id.fqdn[0] == '@')
                {
-                  //A matching PAD entry has been found
-                  return entry;
+                  //A sub-tree name can be used to match all entities whose
+                  //names end with a given domain name
+                  if(idLen > entry->idLen &&
+                     osMemcmp(id + idLen - entry->idLen, entry->id.email,
+                     entry->idLen) == 0)
+                  {
+                     //A matching PAD entry has been found
+                     return entry;
+                  }
+               }
+               else
+               {
+                  //A complete address matches exactly one entity
+                  if(idLen == entry->idLen &&
+                     osMemcmp(id, entry->id.email, entry->idLen) == 0)
+                  {
+                     //A matching PAD entry has been found
+                     return entry;
+                  }
                }
             }
             //X.500 Distinguished Name?
@@ -297,7 +331,7 @@ IpsecPadEntry *ipsecFindPadEntry(IpsecContext *context, uint8_t idType,
             {
                //Compare DNs
                if(idLen == entry->idLen &&
-                  osMemcmp(id, entry->id.dn, idLen) == 0)
+                  osMemcmp(id, entry->id.dn, entry->idLen) == 0)
                {
                   //A matching PAD entry has been found
                   return entry;
@@ -306,9 +340,10 @@ IpsecPadEntry *ipsecFindPadEntry(IpsecContext *context, uint8_t idType,
             //Key ID?
             else if(idType == IPSEC_ID_TYPE_KEY_ID)
             {
-               //Compare key IDs
+               //For this name type, only exact-match syntax must be supported
+               //(refer to RFC 4301, section 4.4.3.1)
                if(idLen == entry->idLen &&
-                  osMemcmp(id, entry->id.keyId, idLen) == 0)
+                  osMemcmp(id, entry->id.keyId, entry->idLen) == 0)
                {
                   //A matching PAD entry has been found
                   return entry;

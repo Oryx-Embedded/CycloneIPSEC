@@ -71,8 +71,8 @@ error_t espEncryptPacket(IpsecContext *context, IpsecSadEntry *sa,
    //Point to the plaintext
    data = payload + sa->ivLen;
 
-   //The transmitted ESP trailer consists of the Padding, Pad Length, and
-   //Next Header fields (refer to RFC 4303, section 2)
+   //The transmitted ESP trailer consists of the Padding, Pad Length, and Next
+   //Header fields (refer to RFC 4303, section 2)
    length = espAddTrailer(sa, data, length, nextHeader);
 
    //Point to the Integrity Checksum Value (ICV)
@@ -88,9 +88,6 @@ error_t espEncryptPacket(IpsecContext *context, IpsecSadEntry *sa,
    {
       //No confidentiality is offered by using the NULL encryption algorithm
       error = espComputeChecksum(context, sa, espHeader, payload, length, icv);
-      //Any error to report?
-      if(error)
-         return error;
    }
    else
 #endif
@@ -102,34 +99,39 @@ error_t espEncryptPacket(IpsecContext *context, IpsecSadEntry *sa,
 
       //The IV must be chosen at random, and must be unpredictable
       error = context->prngAlgo->generate(context->prngContext, iv, sa->ivLen);
-      //Any error to report?
-      if(error)
-         return error;
 
-      //The IV field must be the same size as the block size of the cipher
-      //algorithm being used
-      osMemcpy(payload, iv, sa->ivLen);
+      //Check status code
+      if(!error)
+      {
+         //The IV field must be the same size as the block size of the cipher
+         //algorithm being used
+         osMemcpy(payload, iv, sa->ivLen);
 
-      //Initialize cipher context
-      error = cipherAlgo->init(&sa->cipherContext, sa->encKey, sa->encKeyLen);
-      //Any error to report?
-      if(error)
-         return error;
+         //Initialize cipher context
+         error = cipherAlgo->init(&sa->cipherContext, sa->encKey,
+            sa->encKeyLen);
 
-      //Perform CBC encryption
-      error = cbcEncrypt(cipherAlgo, &sa->cipherContext, iv, data, data,
-         length);
-      //Any error to report?
-      if(error)
-         return error;
+         //Check status code
+         if(!error)
+         {
+            //Perform CBC encryption
+            error = cbcEncrypt(cipherAlgo, &sa->cipherContext, iv, data, data,
+               length);
 
-      //The ICV is a variable-length field computed over the ESP header,
-      //Payload, and ESP trailer fields (refer to RFC 4303, section 2.8)
-      error = espComputeChecksum(context, sa, espHeader, payload,
-         sa->ivLen + length, icv);
-      //Any error to report?
-      if(error)
-         return error;
+            //Check status code
+            if(!error)
+            {
+               //The ICV is a variable-length field computed over the ESP
+               //header, Payload, and ESP trailer fields (refer to RFC 4303,
+               //section 2.8)
+               error = espComputeChecksum(context, sa, espHeader, payload,
+                  sa->ivLen + length, icv);
+            }
+
+            //Erase cipher context
+            cipherAlgo->deinit(&sa->cipherContext);
+         }
+      }
    }
    else
 #endif
@@ -139,8 +141,8 @@ error_t espEncryptPacket(IpsecContext *context, IpsecSadEntry *sa,
    {
       uint8_t counter[16];
 
-      //The IV must be chosen by the encryptor in a manner that ensures that
-      //the same IV value is used only once for a given key (refer to RFC 3686,
+      //The IV must be chosen by the encryptor in a manner that ensures that the
+      //same IV value is used only once for a given key (refer to RFC 3686,
       //section 3.1)
       espGenerateIv(sa->iv);
 
@@ -153,30 +155,32 @@ error_t espEncryptPacket(IpsecContext *context, IpsecSadEntry *sa,
       osMemcpy(counter, sa->encKey + sa->encKeyLen, 4);
       osMemcpy(counter + 4, sa->iv, 8);
 
-      //The block counter begins with the value of one and increments by one
-      //to generate the next portion of the key stream
+      //The block counter begins with the value of one and increments by one to
+      //generate the next portion of the key stream
       STORE32BE(1, counter + 12);
 
       //Initialize cipher context
       error = cipherAlgo->init(&sa->cipherContext, sa->encKey, sa->encKeyLen);
-      //Any error to report?
-      if(error)
-         return error;
 
-      //Perform CTR encryption
-      error = ctrEncrypt(cipherAlgo, &sa->cipherContext,
-         cipherAlgo->blockSize * 8, counter, data, data, length);
-      //Any error to report?
-      if(error)
-         return error;
+      //Check status code
+      if(!error)
+      {
+         //Perform CTR encryption
+         error = ctrEncrypt(cipherAlgo, &sa->cipherContext,
+            cipherAlgo->blockSize * 8, counter, data, data, length);
 
-      //The ICV is a variable-length field computed over the ESP header,
-      //Payload, and ESP trailer fields (refer to RFC 4303, section 2.8)
-      error = espComputeChecksum(context, sa, espHeader, payload,
-         sa->ivLen + length, icv);
-      //Any error to report?
-      if(error)
-         return error;
+         //Check status code
+         if(!error)
+         {
+            //The ICV is a variable-length field computed over the ESP header,
+            //Payload, and ESP trailer fields (refer to RFC 4303, section 2.8)
+            error = espComputeChecksum(context, sa, espHeader, payload,
+               sa->ivLen + length, icv);
+         }
+
+         //Erase cipher context
+         cipherAlgo->deinit(&sa->cipherContext);
+      }
    }
    else
 #endif
@@ -189,8 +193,8 @@ error_t espEncryptPacket(IpsecContext *context, IpsecSadEntry *sa,
       uint8_t aad[12];
       uint8_t nonce[11];
 
-      //The IV must be chosen by the encryptor in a manner that ensures that
-      //the same IV value is used only once for a given key (refer to RFC 4309,
+      //The IV must be chosen by the encryptor in a manner that ensures that the
+      //same IV value is used only once for a given key (refer to RFC 4309,
       //section 3.1)
       espGenerateIv(sa->iv);
 
@@ -219,16 +223,17 @@ error_t espEncryptPacket(IpsecContext *context, IpsecSadEntry *sa,
 
       //Initialize cipher context
       error = cipherAlgo->init(&sa->cipherContext, sa->encKey, sa->encKeyLen);
-      //Any error to report?
-      if(error)
-         return error;
 
-      //Authenticated encryption using CCM
-      error = ccmEncrypt(sa->cipherAlgo, &sa->cipherContext, nonce, 11, aad,
-         aadLen, data, data, length, icv, sa->icvLen);
-      //Any error to report?
-      if(error)
-         return error;
+      //Check status code
+      if(!error)
+      {
+         //Authenticated encryption using CCM
+         error = ccmEncrypt(sa->cipherAlgo, &sa->cipherContext, nonce, 11, aad,
+            aadLen, data, data, length, icv, sa->icvLen);
+
+         //Erase cipher context
+         cipherAlgo->deinit(&sa->cipherContext);
+      }
    }
    else
 #endif
@@ -272,22 +277,27 @@ error_t espEncryptPacket(IpsecContext *context, IpsecSadEntry *sa,
 
       //Initialize cipher context
       error = cipherAlgo->init(&sa->cipherContext, sa->encKey, sa->encKeyLen);
-      //Any error to report?
-      if(error)
-         return error;
 
-      //Initialize GCM context
-      error = gcmInit(&gcmContext, sa->cipherAlgo, &sa->cipherContext);
-      //Any error to report?
-      if(error)
-         return error;
+      //Check status code
+      if(!error)
+      {
+         //Initialize GCM context
+         error = gcmInit(&gcmContext, sa->cipherAlgo, &sa->cipherContext);
 
-      //Authenticated encryption using GCM
-      error = gcmEncrypt(&gcmContext, nonce, 12, aad, aadLen, data, data,
-         length, icv, sa->icvLen);
-      //Any error to report?
-      if(error)
-         return error;
+         //Check status code
+         if(!error)
+         {
+            //Authenticated encryption using GCM
+            error = gcmEncrypt(&gcmContext, nonce, 12, aad, aadLen, data, data,
+               length, icv, sa->icvLen);
+
+            //Erase GCM context
+            gcmDeinit(&gcmContext);
+         }
+
+         //Erase cipher context
+         cipherAlgo->deinit(&sa->cipherContext);
+      }
    }
    else
 #endif
@@ -334,9 +344,6 @@ error_t espEncryptPacket(IpsecContext *context, IpsecSadEntry *sa,
       //Authenticated encryption using ChaCha20Poly1305
       error = chacha20Poly1305Encrypt(sa->encKey, sa->encKeyLen, nonce, 12,
          aad, aadLen, data, data, length, icv, sa->icvLen);
-      //Any error to report?
-      if(error)
-         return error;
    }
    else
 #endif
@@ -363,57 +370,65 @@ error_t espEncryptPacket(IpsecContext *context, IpsecSadEntry *sa,
 
       //Initialize GMAC context
       error = gmacInit(&gmacContext, sa->cipherAlgo, sa->encKey, sa->encKeyLen);
-      //Any error to report?
-      if(error)
-         return error;
 
-      //The nonce is passed to the AES-GMAC authentication algorithm
-      error = gmacReset(&gmacContext, nonce, 12);
-      //Any error to report?
-      if(error)
-         return error;
-
-      //Two formats of the AAD are defined (refer to RFC 4543, section 3.3)
-      if(sa->esn)
+      //Check status code
+      if(!error)
       {
-         //Convert the 64-bit sequence number to network byte order
-         STORE64BE(sa->seqNum, temp);
+         //The nonce is passed to the AES-GMAC authentication algorithm
+         error = gmacReset(&gmacContext, nonce, 12);
 
-         //The AAD consists of the SPI, 64-bit sequence number, and ESP payload
-         gmacUpdate(&gmacContext, (uint8_t *) &espHeader->spi, 4);
-         gmacUpdate(&gmacContext, temp, 8);
-         gmacUpdate(&gmacContext, sa->iv, 8);
-         gmacUpdate(&gmacContext, data, length);
+         //Check status code
+         if(!error)
+         {
+            //Two formats of the AAD are defined (refer to RFC 4543,
+            //section 3.3)
+            if(sa->esn)
+            {
+               //Convert the 64-bit sequence number to network byte order
+               STORE64BE(sa->seqNum, temp);
+
+               //The AAD consists of the SPI, 64-bit sequence number, and ESP
+               //payload
+               gmacUpdate(&gmacContext, (uint8_t *) &espHeader->spi, 4);
+               gmacUpdate(&gmacContext, temp, 8);
+               gmacUpdate(&gmacContext, sa->iv, 8);
+               gmacUpdate(&gmacContext, data, length);
+            }
+            else
+            {
+               //The AAD consists of the SPI, 32-bit sequence number, and ESP
+               //payload
+               gmacUpdate(&gmacContext, espHeader, sizeof(EspHeader));
+               gmacUpdate(&gmacContext, sa->iv, 8);
+               gmacUpdate(&gmacContext, data, length);
+            }
+
+            //The authentication tag must not be truncated, so the length of the
+            //ICV is 16 octets (refer to RFC 4543, section 3.4)
+            error = gmacFinal(&gmacContext, icv, sa->icvLen);
+         }
+
+         //Erase GMAC context
+         gmacDeinit(&gmacContext);
       }
-      else
-      {
-         //The AAD consists of the SPI, 32-bit sequence number, and ESP payload
-         gmacUpdate(&gmacContext, espHeader, sizeof(EspHeader));
-         gmacUpdate(&gmacContext, sa->iv, 8);
-         gmacUpdate(&gmacContext, data, length);
-      }
-
-      //The authentication tag must not be truncated, so the length of the ICV
-      //is 16 octets (refer to RFC 4543, section 3.4)
-      error = gmacFinal(&gmacContext, icv, sa->icvLen);
-      //Any error to report?
-      if(error)
-         return error;
-
    }
    else
 #endif
    //Invalid cipher mode?
    {
       //The specified cipher mode is not supported
-      return ERROR_UNSUPPORTED_CIPHER_MODE;
+      error = ERROR_UNSUPPORTED_CIPHER_MODE;
    }
 
-   //Total length of the encrypted packet
-   *payloadLen = sa->ivLen + length + sa->icvLen;
+   //Check status code
+   if(!error)
+   {
+      //Total length of the encrypted packet
+      *payloadLen = sa->ivLen + length + sa->icvLen;
+   }
 
-   //Successful processing
-   return NO_ERROR;
+   //Return status code
+   return error;
 }
 
 
@@ -455,7 +470,7 @@ error_t espComputeChecksum(IpsecContext *context, IpsecSadEntry *sa,
          cmacUpdate(cmacContext, espHeader, sizeof(EspHeader));
          cmacUpdate(cmacContext, payload, length);
 
-         //Extended sequence number?
+         //Extended sequence numbers?
          if(sa->esn)
          {
             //The high-order 32 bits are maintained as part of the sequence
@@ -466,7 +481,10 @@ error_t espComputeChecksum(IpsecContext *context, IpsecSadEntry *sa,
          }
 
          //Finalize CMAC computation
-         cmacFinal(cmacContext, icv, sa->icvLen);
+         error = cmacFinal(cmacContext, icv, sa->icvLen);
+
+         //Erase CMAC context
+         cmacDeinit(cmacContext);
       }
    }
    else
@@ -492,7 +510,7 @@ error_t espComputeChecksum(IpsecContext *context, IpsecSadEntry *sa,
          hmacUpdate(hmacContext, espHeader, sizeof(EspHeader));
          hmacUpdate(hmacContext, payload, length);
 
-         //Extended sequence number?
+         //Extended sequence numbers?
          if(sa->esn)
          {
             //The high-order 32 bits are maintained as part of the sequence
@@ -507,6 +525,9 @@ error_t espComputeChecksum(IpsecContext *context, IpsecSadEntry *sa,
 
          //Copy the resulting checksum value
          osMemcpy(icv, hmacContext->digest, sa->icvLen);
+
+         //Erase HMAC context
+         hmacDeinit(hmacContext);
       }
    }
    else
@@ -537,8 +558,8 @@ size_t espComputePadLength(IpsecSadEntry *sa, size_t length)
    //CBC cipher mode?
    if(sa->cipherMode == CIPHER_MODE_CBC)
    {
-      //For the purpose of ensuring that data to be encrypted are a multiple
-      //of the algorithm's block size, the padding computation applies to the
+      //For the purpose of ensuring that data to be encrypted are a multiple of
+      //the algorithm's block size, the padding computation applies to the
       //Payload Data exclusive of any IV, but including the ESP trailer fields
       //(refer to RFC 4303, section 2.4)
       n = (length + sizeof(EspTrailer)) % sa->cipherAlgo->blockSize;
@@ -604,8 +625,8 @@ size_t espAddTrailer(IpsecSadEntry *sa, uint8_t *data, size_t length,
    //preceding it in the Padding field (refer to RFC 4303, section 2.5)
    espTrailer->padLength = n;
 
-   //The Next Header field identifies the type of data contained in the
-   //payload data (refer to RFC 4303, section 2.6)
+   //The Next Header field identifies the type of data contained in the payload
+   //data (refer to RFC 4303, section 2.6)
    espTrailer->nextHeader = nextHeader;
 
    //Return the length of the resulting payload data

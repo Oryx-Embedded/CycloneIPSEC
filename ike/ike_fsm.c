@@ -459,74 +459,84 @@ error_t ikeProcessChildSaEvents(IkeChildSaEntry *childSa)
 error_t ikeProcessSaInitEvent(IkeSaEntry *sa)
 {
    error_t error;
-   bool_t valid;
    IkeContext *context;
+
+   //Initialize status code
+   error = NO_ERROR;
 
    //Point to the IKE context
    context = sa->context;
 
-   //Initialize flag
-   valid = FALSE;
-
-   //Valid entity's ID
-   if(context->idType != IKE_ID_TYPE_INVALID)
+#if (IKE_CERT_AUTH_SUPPORT == ENABLED)
+   //Certificate authentication?
+   if(context->authMethod == IPSEC_AUTH_METHOD_CERT &&
+      context->certChain != NULL && context->certChainLen > 0)
    {
-#if (IKE_PSK_AUTH_SUPPORT == ENABLED)
-      //Pre-shared key authentication?
-      if(context->pskLen > 0)
-      {
-         valid = TRUE;
-      }
-#endif
+      //Disable EAP authentication
+      sa->eapState = IKE_EAP_STATE_DISABLED;
    }
    else
-   {
-#if (IKE_CERT_AUTH_SUPPORT == ENABLED)
-      //Certificate authentication?
-      if(context->certChain != NULL && context->certChainLen > 0)
-      {
-         valid = TRUE;
-      }
 #endif
+#if (IKE_PSK_AUTH_SUPPORT == ENABLED)
+   //Pre-shared key authentication?
+   if(context->authMethod == IPSEC_AUTH_METHOD_PSK &&
+      context->id.type != IKE_ID_TYPE_INVALID &&
+      context->pskLen > 0)
+   {
+      //Disable EAP authentication
+      sa->eapState = IKE_EAP_STATE_DISABLED;
+   }
+   else
+#endif
+#if (IKE_EAP_AUTH_SUPPORT == ENABLED)
+   //EAP-based authentication?
+   if(context->authMethod == IPSEC_AUTH_METHOD_EAP &&
+      context->id.type != IKE_ID_TYPE_INVALID &&
+      osStrlen(context->username) > 0 &&
+      osStrlen(context->password) > 0)
+   {
+      //Enable EAP authentication
+      sa->eapState = IKE_EAP_STATE_INIT;
+   }
+   else
+#endif
+   //Invalid authentication method?
+   {
+      //Report an error
+      error = ERROR_NOT_CONFIGURED;
    }
 
-   //Valid credentials?
-   if(valid)
+   //Check status code
+   if(!error)
    {
       //Each endpoint chooses one of the two SPIs and must choose them so as to
       //be unique identifiers of an IKE SA (refer to RFC 7296, section 2.6)
       error = ikeGenerateSaSpi(sa, sa->initiatorSpi);
-
-      //Check status code
-      if(!error)
-      {
-         //Nonces used in IKEv2 must be randomly chosen and must be at least
-         //128 bits in size (refer to RFC 7296, section 2.10)
-         error = ikeGenerateNonce(context, sa->initiatorNonce,
-            &sa->initiatorNonceLen);
-      }
-
-      //Check status code
-      if(!error)
-      {
-         //Generate an ephemeral key pair
-         error = ikeGenerateKeyPair(&sa->keContext, context->prngAlgo,
-            context->prngContext);
-      }
-
-      //Check status code
-      if(!error)
-      {
-         //The first exchange of an IKE session, IKE_SA_INIT, negotiates
-         //security parameters for the IKE SA, sends nonces, and sends
-         //Diffie-Hellman values
-         error = ikeSendIkeSaInitRequest(sa);
-      }
    }
-   else
+
+   //Check status code
+   if(!error)
    {
-      //No valid credentials provided
-      error = ERROR_NOT_CONFIGURED;
+      //Nonces used in IKEv2 must be randomly chosen and must be at least 128
+      //bits in size (refer to RFC 7296, section 2.10)
+      error = ikeGenerateNonce(context, sa->initiatorNonce,
+         &sa->initiatorNonceLen);
+   }
+
+   //Check status code
+   if(!error)
+   {
+      //Generate an ephemeral key pair
+      error = ikeGenerateKeyPair(&sa->keContext, context->prngAlgo,
+         context->prngContext);
+   }
+
+   //Check status code
+   if(!error)
+   {
+      //The first exchange of an IKE session, IKE_SA_INIT, negotiates security
+      //parameters for the IKE SA, sends nonces, and sends Diffie-Hellman values
+      error = ikeSendIkeSaInitRequest(sa);
    }
 
    //Return status code
@@ -871,11 +881,6 @@ error_t ikeProcessChildSaInitEvent(IkeChildSaEntry *childSa)
       //Check the state of the IKE SA
       if(bestSa->state == IKE_SA_STATE_OPEN)
       {
-         //Attach the Child SA to the IKE SA
-         bestSa->childSa1 = childSa;
-         bestSa->childSa2 = NULL;
-         childSa->sa = bestSa;
-
          //Generate a new SPI for the Child SA
          error = ikeGenerateChildSaSpi(childSa, childSa->localSpi);
 
@@ -907,6 +912,11 @@ error_t ikeProcessChildSaInitEvent(IkeChildSaEntry *childSa)
          //Check status code
          if(!error)
          {
+            //Attach the Child SA to the IKE SA
+            bestSa->childSa1 = childSa;
+            bestSa->childSa2 = NULL;
+            childSa->sa = bestSa;
+
             //Update the state of the IKE SA
             ikeChangeSaState(bestSa, IKE_SA_STATE_CREATE_CHILD_REQ);
 
@@ -923,35 +933,42 @@ error_t ikeProcessChildSaInitEvent(IkeChildSaEntry *childSa)
    else
 #endif
    {
-      //Create a new IKE SA
-      sa = ikeCreateSaEntry(context);
+      //Generate a new SPI for the Child SA
+      error = ikeGenerateChildSaSpi(childSa, childSa->localSpi);
 
-      //Successful IKE SA creation?
-      if(sa != NULL)
+      //Check status code
+      if(!error)
       {
-         //Initialize IKE SA
-         sa->remoteIpAddr = childSa->remoteIpAddr;
-         sa->childSa1 = childSa;
+         //Create a new IKE SA
+         sa = ikeCreateSaEntry(context);
 
-         //The original initiator always refers to the party who initiated the
-         //exchange (refer to RFC 7296, section 2.2)
-         sa->originalInitiator = TRUE;
+         //Successful IKE SA creation?
+         if(sa != NULL)
+         {
+            //Initialize IKE SA
+            sa->remoteIpAddr = childSa->remoteIpAddr;
+            sa->childSa1 = childSa;
 
-         //Select the preferred key exchange method
-         sa->keContext.groupNum = context->preferredGroupNum;
+            //The original initiator always refers to the party who initiated the
+            //exchange (refer to RFC 7296, section 2.2)
+            sa->originalInitiator = TRUE;
 
-         //Attach the newly created IKE SA to the Child SA
-         childSa->sa = sa;
+            //Select the preferred key exchange method
+            sa->keContext.groupNum = context->preferredGroupNum;
 
-         //Update the state of the IKE SA
-         ikeChangeSaState(sa, IKE_SA_STATE_INIT_REQ);
-         //Notify the IKE context that the IKE SA should be created
-         osSetEvent(&context->event);
-      }
-      else
-      {
-         //Failed to create IKE SA
-         error = ERROR_OUT_OF_RESOURCES;
+            //Attach the newly created IKE SA to the Child SA
+            childSa->sa = sa;
+
+            //Update the state of the IKE SA
+            ikeChangeSaState(sa, IKE_SA_STATE_INIT_REQ);
+            //Notify the IKE context that the IKE SA should be created
+            osSetEvent(&context->event);
+         }
+         else
+         {
+            //Failed to create IKE SA
+            error = ERROR_OUT_OF_RESOURCES;
+         }
       }
    }
 
@@ -993,6 +1010,7 @@ error_t ikeProcessChildSaRekeyEvent(IkeChildSaEntry *childSa)
       newChildSa->oldChildSa = childSa;
       newChildSa->mode = childSa->mode;
       newChildSa->protocol = childSa->protocol;
+      newChildSa->esn = childSa->esn;
 #if (IKE_CHILD_SA_PFS_SUPPORT == ENABLED)
       newChildSa->pfs = childSa->pfs;
 #endif

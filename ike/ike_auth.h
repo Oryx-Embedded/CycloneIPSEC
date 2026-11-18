@@ -40,15 +40,15 @@ extern "C" {
 #endif
 
 //IKEv2 related functions
-error_t ikeGenerateAuth(IkeSaEntry *sa, const IkeIdPayload *idPayload,
-   uint8_t *authMethod, uint8_t *authData, size_t *authDataLen);
+error_t ikeGenerateAuth(IkeSaEntry *sa, uint8_t *authMethod, uint8_t *authData,
+   size_t *authDataLen);
 
-error_t ikeVerifyAuth(IkeSaEntry *sa, IpsecPadEntry *padEntry,
-   const IkeIdPayload *idPayload, const IkeCertPayload *certPayload,
-   const IkeAuthPayload *authPayload);
+error_t ikeVerifyAuth(IkeSaEntry *sa, uint8_t authMethod,
+   const uint8_t *authData, size_t authDataLen, const uint8_t *certData,
+   size_t certDataLen);
 
 error_t ikeComputeMacAuth(IkeSaEntry *sa, const uint8_t *key, size_t keyLen,
-   const uint8_t *id, size_t idLen, uint8_t *mac, bool_t initiator);
+   const IkeId *id, uint8_t *mac, bool_t initiator);
 
 //C++ guard
 #ifdef __cplusplus

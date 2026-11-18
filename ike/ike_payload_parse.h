@@ -56,6 +56,8 @@ typedef struct
    const IkeNoncePayload *nonce;
    const IkeTsPayload *tsi;
    const IkeTsPayload *tsr;
+   const IkeConfigPayload *config;
+   const IkeEapPayload *eap;
    const IkeNotifyPayload *useTransportModeNotify;
    const IkeNotifyPayload *rekeySaNotify;
 #if (IKE_COOKIE_SUPPORT == ENABLED)
@@ -94,6 +96,9 @@ error_t ikeParseIdPayload(IkeSaEntry *sa, const IkeIdPayload *idPayload);
 error_t ikeParseCertReqPayload(IkeSaEntry *sa,
    const IkeCertReqPayload *certReqPayload);
 
+error_t ikeParseAuthPayload(IkeSaEntry *sa, const IkeAuthPayload *authPayload,
+   const IkeCertPayload *certPayload);
+
 error_t ikeParseNoncePayload(const IkeNoncePayload *noncePayload,
    uint8_t *nonce, size_t *nonceLen);
 
@@ -119,6 +124,11 @@ error_t ikeParseTsPayload(const IkeTsPayload *tsPayload, uint_t index,
    IkeTsEntry *tsEntry);
 
 error_t ikeParseTsEntry(const IkeTs *ts, size_t length, IkeTsEntry *tsEntry);
+
+error_t ikeParseConfigPayload(IkeSaEntry *sa,
+   const IkeConfigPayload *configPayload);
+
+error_t ikeParseEapPayload(IkeSaEntry *sa, const IkeEapPayload *eapPayload);
 
 const IkePayloadHeader *ikeGetPayload(const uint8_t *message, size_t length,
    uint8_t type, uint_t index);

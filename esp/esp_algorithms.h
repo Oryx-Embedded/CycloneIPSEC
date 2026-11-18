@@ -56,7 +56,7 @@ error_t espAddSupportedEncTransforms(IkeChildSaEntry *childSa,
 error_t espAddSupportedAuthTransforms(IkeChildSaEntry *childSa,
    IkeProposal *proposal, uint8_t **lastSubstruc);
 
-error_t espAddSupportedEsnTransforms(IkeChildSaEntry *childSa,
+error_t espAddSupportedSnTransforms(IkeChildSaEntry *childSa,
    IkeProposal *proposal, uint8_t **lastSubstruc);
 
 const IkeEncAlgo *espSelectEncTransform(IkeChildSaEntry *childSa,
@@ -65,7 +65,7 @@ const IkeEncAlgo *espSelectEncTransform(IkeChildSaEntry *childSa,
 uint16_t espSelectAuthTransform(IkeChildSaEntry *childSa,
    const IkeProposal *proposal, size_t proposalLen);
 
-uint16_t espSelectEsnTransform(IkeChildSaEntry *childSa,
+uint16_t espSelectSnTransform(IkeChildSaEntry *childSa,
    const IkeProposal *proposal, size_t proposalLen);
 
 error_t espSelectSaProposal(IkeChildSaEntry *childSa,

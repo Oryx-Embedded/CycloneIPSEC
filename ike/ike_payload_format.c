@@ -37,6 +37,7 @@
 #include "ike/ike_payload_format.h"
 #include "ike/ike_auth.h"
 #include "ike/ike_certificate.h"
+#include "ike/ike_eap.h"
 #include "ike/ike_key_exchange.h"
 #include "ike/ike_key_material.h"
 #include "ah/ah_algorithms.h"
@@ -297,11 +298,7 @@ error_t ikeFormatChildSaProposal(IkeChildSaEntry *childSa, uint8_t *p,
    error_t error;
    size_t n;
    uint8_t *lastSubstruc;
-   IkeContext *context;
    IkeProposal *proposal;
-
-   //Point to the IKE context
-   context = childSa->context;
 
    //Point to the Proposal substructure
    proposal = (IkeProposal *) p;
@@ -401,8 +398,8 @@ error_t ikeFormatChildSaProposal(IkeChildSaEntry *childSa, uint8_t *p,
                return error;
          }
 #endif
-         //The accepted proposal contains a single ESN transform
-         error = ikeAddTransform(IKE_TRANSFORM_TYPE_ESN, childSa->esn,
+         //The accepted proposal contains a single SN transform
+         error = ikeAddTransform(IKE_TRANSFORM_TYPE_SN, childSa->snId,
             0, proposal, &lastSubstruc);
          //Any error to report?
          if(error)
@@ -452,8 +449,8 @@ error_t ikeFormatChildSaProposal(IkeChildSaEntry *childSa, uint8_t *p,
                return error;
          }
 #endif
-         //The accepted proposal contains a single ESN transform
-         error = ikeAddTransform(IKE_TRANSFORM_TYPE_ESN, childSa->esn,
+         //The accepted proposal contains a single SN transform
+         error = ikeAddTransform(IKE_TRANSFORM_TYPE_SN, childSa->snId,
             0, proposal, &lastSubstruc);
          //Any error to report?
          if(error)
@@ -507,7 +504,7 @@ error_t ikeFormatKePayload(IkeKeContext *keContext, uint8_t *p, size_t *written,
    //Key Exchange Data was computed
    kePayload->keyExchangeMethod = htons(keContext->groupNum);
 
-   //For forward compatibility, all fields marked RESERVED must be set to
+   //For forward compatibility, all fields marked reserved must be set to
    //zero (refer to RFC 7296, section 2.5)
    kePayload->reserved = 0;
 
@@ -543,15 +540,15 @@ error_t ikeFormatKePayload(IkeKeContext *keContext, uint8_t *p, size_t *written,
 error_t ikeFormatIdPayload(IkeSaEntry *sa, uint8_t *p, size_t *written,
    uint8_t **nextPayload)
 {
-   error_t error;
    IkeContext *context;
    IkeIdPayload *idPayload;
 
-   //Initialize status code
-   error = NO_ERROR;
-
    //Point to the IKE context
    context = sa->context;
+
+   //Invalid ID type?
+   if(context->id.type == IKE_ID_TYPE_INVALID)
+      return ERROR_INVALID_TYPE;
 
    //Fix the Next Payload field of the previous payload
    if(sa->originalInitiator)
@@ -571,66 +568,25 @@ error_t ikeFormatIdPayload(IkeSaEntry *sa, uint8_t *p, size_t *written,
    idPayload->header.critical = FALSE;
    idPayload->header.reserved = 0;
 
-   //For forward compatibility, all fields marked RESERVED must be set to
+   //For forward compatibility, all fields marked reserved must be set to
    //zero (refer to RFC 7296, section 2.5)
    osMemset(idPayload->reserved, 0, 3);
 
-   //Length of the payload header
-   *written = sizeof(IkeIdPayload);
+   //Set ID type
+   idPayload->idType = context->id.type;
+   //Copy identification data
+   osMemcpy(idPayload->idData, context->id.data, context->id.length);
 
-   //Check the type of identification being used
-   if(context->idType != IKE_ID_TYPE_INVALID)
-   {
-      //Set ID type
-      idPayload->idType = context->idType;
+   //Total length of the payload
+   *written = sizeof(IkeIdPayload) + context->id.length;
+   //Fix the Payload Length field of the payload header
+   idPayload->header.payloadLength = htons(*written);
 
-      //Copy identification data
-      osMemcpy(idPayload->idData, context->id, context->idLen);
-      //Total length of the payload
-      *written += context->idLen;
-   }
-   else
-   {
-#if (IKE_CERT_AUTH_SUPPORT == ENABLED)
-      //Check whether an end-entity's certificate exists
-      if(context->certChain != NULL && context->certChainLen > 0)
-      {
-         size_t n;
+   //Keep track of the Next Payload field
+   *nextPayload = &idPayload->header.nextPayload;
 
-         //Set ID type
-         idPayload->idType = IKE_ID_TYPE_DER_ASN1_DN;
-
-         //Extract the subject's distinguished name from the certificate
-         error = ikeGetCertSubjectDn(context->certChain, context->certChainLen,
-            idPayload->idData, &n);
-
-         //Check status code
-         if(!error)
-         {
-            //Total length of the payload
-            *written += n;
-         }
-      }
-      else
-#endif
-      {
-         //Report an error
-         error = ERROR_INVALID_TYPE;
-      }
-   }
-
-   //Check status code
-   if(!error)
-   {
-      //Fix the Payload Length field of the payload header
-      idPayload->header.payloadLength = htons(*written);
-
-      //Keep track of the Next Payload field
-      *nextPayload = &idPayload->header.nextPayload;
-   }
-
-   //Return status code
-   return error;
+   //Successful processing
+   return NO_ERROR;
 }
 
 
@@ -663,8 +619,9 @@ error_t ikeFormatCertPayloads(IkeSaEntry *sa, uint8_t *p, size_t *written,
    //Total length of the Certificate payloads
    *written = 0;
 
-   //Check whether an end-entity's certificate exists
-   if(context->certChain != NULL && context->certChainLen > 0)
+   //Certificate authentication?
+   if(context->authMethod == IPSEC_AUTH_METHOD_CERT &&
+      context->certChain != NULL && context->certChainLen > 0)
    {
       //Point to the certificate chain
       certChain = context->certChain;
@@ -829,17 +786,19 @@ error_t ikeFormatCertReqPayload(IkeSaEntry *sa, uint8_t *p, size_t *written,
       //Point to the current PAD entry
       entry = &ipsecContext->pad[i];
 
-      //Valid authentication method?
-      if(entry->authMethod == IPSEC_AUTH_METHOD_IKEV2)
+      //Certificate-based authentication?
+      if(entry->authProtocol == IPSEC_AUTH_PROTOCOL_IKEV2 &&
+         entry->authMethod == IPSEC_AUTH_METHOD_CERT)
       {
          //Valid trusted CA list?
-         if(entry->trustedCaList != NULL && entry->trustedCaListLen > 0)
+         if(entry->authData.trustedCaList != NULL &&
+            entry->authData.trustedCaListLen > 0)
          {
-            //The Certification Authority value is a concatenated list of
-            //SHA-1 hashes of the public keys of trusted Certification
-            //Authorities (CAs)
-            error = ikeFormatCertAuthorities(entry->trustedCaList,
-               entry->trustedCaListLen, certReqPayload->certAuthority, &n);
+            //The Certification Authority value is a concatenated list of SHA-1
+            //hashes of the public keys of trusted CAs
+            error = ikeFormatCertAuthorities(entry->authData.trustedCaList,
+               entry->authData.trustedCaListLen, certReqPayload->certAuthority,
+               &n);
          }
       }
    }
@@ -888,15 +847,14 @@ error_t ikeFormatCertReqPayload(IkeSaEntry *sa, uint8_t *p, size_t *written,
 /**
  * @brief Format Authentication payload
  * @param[in] sa Pointer to the IKE SA
- * @param[in] idPayload Pointer to the Identification payload
  * @param[out] p Buffer where to format the payload
  * @param[out] written Length of the resulting payload
  * @param[in,out] nextPayload Pointer to the Next Payload field
  * @return Error code
  **/
 
-error_t ikeFormatAuthPayload(IkeSaEntry *sa, const IkeIdPayload *idPayload,
-   uint8_t *p, size_t *written, uint8_t **nextPayload)
+error_t ikeFormatAuthPayload(IkeSaEntry *sa, uint8_t *p, size_t *written,
+   uint8_t **nextPayload)
 {
    error_t error;
    size_t n;
@@ -913,13 +871,13 @@ error_t ikeFormatAuthPayload(IkeSaEntry *sa, const IkeIdPayload *idPayload,
    authPayload->header.critical = FALSE;
    authPayload->header.reserved = 0;
 
-   //For forward compatibility, all fields marked RESERVED must be set to
+   //For forward compatibility, all fields marked reserved must be set to
    //zero (refer to RFC 7296, section 2.5)
    osMemset(authPayload->reserved, 0, 3);
 
-   //Generate AUTH value
-   error = ikeGenerateAuth(sa, idPayload, &authPayload->authMethod,
-      authPayload->authData, &n);
+   //Generate the AUTH value
+   error = ikeGenerateAuth(sa, &authPayload->authMethod, authPayload->authData,
+      &n);
 
    //Check status code
    if(!error)
@@ -1220,61 +1178,69 @@ error_t ikeFormatNatDetectSrcIpNotificationData(IkeSaEntry *sa, uint8_t *p,
    //Point to the IKE context
    context = sa->context;
 
-   //Check whether the entity is the original initiator of the IKE SA
-   if(sa->originalInitiator)
+   //Check the state of the IKE SA
+   if(sa->state == IKE_SA_STATE_RESERVED ||
+      sa->state == IKE_SA_STATE_INIT_REQ)
    {
-      //Point to the network interface
-      interface = context->interface;
-
-      //Get exclusive access
-      netLock(context->netContext);
-
-      //Retrieve the IP address of the host
-      error = ipSelectSourceAddr(context->netContext, &interface,
-         &sa->remoteIpAddr, &localIpAddr);
-
-      //Release exclusive access
-      netUnlock(context->netContext);
-
-      //Any error to report?
-      if(error)
-         return error;
-
-      //Convert the source port number to network byte order
-      if(sa->localNat || sa->remoteNat)
+      //Check whether the entity is the original initiator of the IKE SA
+      if(sa->originalInitiator)
       {
-         localPort = HTONS(IPSEC_NAT_PORT);
+         //Point to the network interface
+         interface = context->interface;
+
+         //Get exclusive access
+         netLock(context->netContext);
+
+         //Retrieve the IP address of the host
+         error = ipSelectSourceAddr(context->netContext, &interface,
+            &sa->remoteIpAddr, &localIpAddr);
+
+         //Release exclusive access
+         netUnlock(context->netContext);
+
+         //Any error to report?
+         if(error)
+            return error;
+
+         //Convert the source port number to network byte order
+         if(sa->localNat || sa->remoteNat)
+         {
+            localPort = HTONS(IPSEC_NAT_PORT);
+         }
+         else
+         {
+            localPort = HTONS(IKE_PORT);
+         }
       }
       else
       {
-         localPort = HTONS(IKE_PORT);
+         //Retrieve the IP address of the host
+         localIpAddr = context->localIpAddr;
+         //Convert the source port number to network byte order
+         localPort = htons(context->localPort);
       }
-   }
-   else
-   {
-      //Retrieve the IP address of the host
-      localIpAddr = context->localIpAddr;
-      //Convert the source port number to network byte order
-      localPort = htons(context->localPort);
+
+      //The data associated with the NAT_DETECTION_SOURCE_IP notification is a
+      //SHA-1 digest of the SPIs (in the order they appear in the header), IP
+      //address, and port from which this packet was sent
+      sha1Init(&sha1Context);
+      sha1Update(&sha1Context, sa->initiatorSpi, IKE_SPI_SIZE);
+      sha1Update(&sha1Context, sa->responderSpi, IKE_SPI_SIZE);
+      sha1Update(&sha1Context, localIpAddr.addr, localIpAddr.length);
+      sha1Update(&sha1Context, &localPort, sizeof(localPort));
+      sha1Final(&sha1Context, sa->natDetectSrcIpDigest);
    }
 
-   //The data associated with the NAT_DETECTION_SOURCE_IP notification is a
-   //SHA-1 digest of the SPIs (in the order they appear in the header), IP
-   //address, and port from which this packet was sent
-   sha1Init(&sha1Context);
-   sha1Update(&sha1Context, sa->initiatorSpi, IKE_SPI_SIZE);
-   sha1Update(&sha1Context, sa->responderSpi, IKE_SPI_SIZE);
-   sha1Update(&sha1Context, localIpAddr.addr, localIpAddr.length);
-   sha1Update(&sha1Context, &localPort, sizeof(localPort));
-   sha1Final(&sha1Context, p);
-
+   //Copy the SHA-1 digest
+   osMemcpy(p, sa->natDetectSrcIpDigest, SHA1_DIGEST_SIZE);
    //Set the length of the notification data
    *written = SHA1_DIGEST_SIZE;
 
    //Successful processing
    return NO_ERROR;
 #else
-   //Minimal implementations are not required to support NAT traversal
+   //Minimal implementations are not required to support NAT traversal (refer
+   //to RFC 7296, section 4)
    return ERROR_NOT_IMPLEMENTED;
 #endif
 }
@@ -1300,46 +1266,54 @@ error_t ikeFormatNatDetectDestIpNotificationData(IkeSaEntry *sa, uint8_t *p,
    //Point to the IKE context
    context = sa->context;
 
-   //Check whether the entity is the original initiator of the IKE SA
-   if(sa->originalInitiator)
+   //Check the state of the IKE SA
+   if(sa->state == IKE_SA_STATE_RESERVED ||
+      sa->state == IKE_SA_STATE_INIT_REQ)
    {
-      //Get the recipient IP address
-      remoteIpAddr = sa->remoteIpAddr;
-
-      //Convert the destination port number to network byte order
-      if(sa->localNat || sa->remoteNat)
+      //Check whether the entity is the original initiator of the IKE SA
+      if(sa->originalInitiator)
       {
-         remotePort = HTONS(IPSEC_NAT_PORT);
+         //Get the recipient IP address
+         remoteIpAddr = sa->remoteIpAddr;
+
+         //Convert the destination port number to network byte order
+         if(sa->localNat || sa->remoteNat)
+         {
+            remotePort = HTONS(IPSEC_NAT_PORT);
+         }
+         else
+         {
+            remotePort = HTONS(IKE_PORT);
+         }
       }
       else
       {
-         remotePort = HTONS(IKE_PORT);
+         //Get the recipient IP address and port number
+         remoteIpAddr = context->remoteIpAddr;
+         remotePort = htons(context->remotePort);
       }
-   }
-   else
-   {
-      //Get the recipient IP address and port number
-      remoteIpAddr = context->remoteIpAddr;
-      remotePort = htons(context->remotePort);
+
+      //The data associated with the NAT_DETECTION_DESTINATION_IP notification
+      //is a SHA-1 digest of the SPIs (in the order they appear in the header),
+      //IP address, and port to which this packet was sent
+      sha1Init(&sha1Context);
+      sha1Update(&sha1Context, sa->initiatorSpi, IKE_SPI_SIZE);
+      sha1Update(&sha1Context, sa->responderSpi, IKE_SPI_SIZE);
+      sha1Update(&sha1Context, remoteIpAddr.addr, remoteIpAddr.length);
+      sha1Update(&sha1Context, &remotePort, sizeof(remotePort));
+      sha1Final(&sha1Context, sa->natDetectDestIpDigest);
    }
 
-   //The data associated with the NAT_DETECTION_DESTINATION_IP notification is
-   //a SHA-1 digest of the SPIs (in the order they appear in the header), IP
-   //address, and port to which this packet was sent
-   sha1Init(&sha1Context);
-   sha1Update(&sha1Context, sa->initiatorSpi, IKE_SPI_SIZE);
-   sha1Update(&sha1Context, sa->responderSpi, IKE_SPI_SIZE);
-   sha1Update(&sha1Context, remoteIpAddr.addr, remoteIpAddr.length);
-   sha1Update(&sha1Context, &remotePort, sizeof(remotePort));
-   sha1Final(&sha1Context, p);
-
+   //Copy the SHA-1 digest
+   osMemcpy(p, sa->natDetectDestIpDigest, SHA1_DIGEST_SIZE);
    //Set the length of the notification data
    *written = SHA1_DIGEST_SIZE;
 
    //Successful processing
    return NO_ERROR;
 #else
-   //Minimal implementations are not required to support NAT traversal
+   //Minimal implementations are not required to support NAT traversal (refer
+   //to RFC 7296, section 4)
    return ERROR_NOT_IMPLEMENTED;
 #endif
 }
@@ -1396,6 +1370,9 @@ error_t ikeFormatSignHashAlgosNotificationData(IkeSaEntry *sa, uint8_t *p,
    p += sizeof(uint16_t);
    *written += sizeof(uint16_t);
 #endif
+
+
+
 
 #if (IKE_ED25519_SIGN_SUPPORT == ENABLED || IKE_ED448_SIGN_SUPPORT == ENABLED)
    //Inserting "Identity" hash identifier indicates that the receiver supports
@@ -1614,8 +1591,8 @@ error_t ikeFormatTsiPayload(IkeChildSaEntry *childSa, uint8_t *p,
    //Keep track of the Next Payload field
    *nextPayload = &tsPayload->header.nextPayload;
 
-   //Return status code
-   return error;
+   //Sucessful processing
+   return NO_ERROR;
 }
 
 
@@ -1754,8 +1731,8 @@ error_t ikeFormatTsrPayload(IkeChildSaEntry *childSa, uint8_t *p,
    //Keep track of the Next Payload field
    *nextPayload = &tsPayload->header.nextPayload;
 
-   //Return status code
-   return error;
+   //Sucessful processing
+   return NO_ERROR;
 }
 
 
@@ -1837,6 +1814,112 @@ error_t ikeFormatTsEntry(const IkeTsEntry *tsEntry, uint8_t *p,
 
    //Return status code
    return error;
+}
+
+
+/**
+ * @brief Format Configuration payload
+ * @param[in] sa Pointer to the IKE SA
+ * @param[out] p Buffer where to format the payload
+ * @param[out] written Length of the resulting payload
+ * @param[in,out] nextPayload Pointer to the Next Payload field
+ * @return Error code
+ **/
+
+error_t ikeFormatConfigPayload(IkeSaEntry *sa, uint8_t *p, size_t *written,
+   uint8_t **nextPayload)
+{
+   //Minimal implementations are not required to support requesting temporary
+   //IP addresses (refer to RFC 7296, section 4)
+   return ERROR_NOT_IMPLEMENTED;
+}
+
+
+/**
+ * @brief Format configuration attribute
+ * @param[in] type Configuration attribute type
+ * @param[out] p Buffer where to format the configuration attribute
+ * @param[out] written Length of the resulting configuration attribute
+ * @return Error code
+ **/
+
+error_t ikeFormatConfigAttr(IkeConfigAttrType type, const void *value,
+   size_t length, uint8_t *p, size_t *written)
+{
+   IkeConfigAttr *configAttr;
+
+   //Point to the configuration attribute
+   configAttr = (IkeConfigAttr *) p;
+
+   //Configuration attributes are type length value (TLV) structures
+   configAttr->type = htons(type);
+   configAttr->length = htons(length);
+
+   //The Value field contains the variable-length value of this configuration
+   //attribute (refer to RFC 7296, section 3.15.1)
+   if(length > 0)
+   {
+      osMemcpy(configAttr->value, value, length);
+   }
+
+   //Length of the configuration attribute
+   *written = sizeof(IkeConfigAttr) + length;
+
+   //Successful processing
+   return NO_ERROR;
+}
+
+
+/**
+ * @brief Format EAP payload
+ * @param[in] sa Pointer to the IKE SA
+ * @param[out] p Buffer where to format the payload
+ * @param[out] written Length of the resulting payload
+ * @param[in,out] nextPayload Pointer to the Next Payload field
+ * @return Error code
+ **/
+
+error_t ikeFormatEapPayload(IkeSaEntry *sa, uint8_t *p, size_t *written,
+   uint8_t **nextPayload)
+{
+#if (IKE_EAP_AUTH_SUPPORT == ENABLED)
+   error_t error;
+   size_t n;
+   IkeEapPayload *eapPayload;
+
+   //Fix the Next Payload field of the previous payload
+   **nextPayload = IKE_PAYLOAD_TYPE_EAP;
+
+   //Point to the EAP payload header
+   eapPayload = (IkeEapPayload *) p;
+
+   //Format Nonce payload header
+   eapPayload->header.nextPayload = IKE_PAYLOAD_TYPE_LAST;
+   eapPayload->header.critical = FALSE;
+   eapPayload->header.reserved = 0;
+
+   //Format EAP message
+   error = ikeFormatEapPacket(sa, eapPayload->eapMessage, &n);
+
+   //Check status code
+   if(!error)
+   {
+      //Total length of the payload
+      *written = sizeof(IkeEapPayload) + n;
+      //Fix the Payload Length field of the payload header
+      eapPayload->header.payloadLength = htons(*written);
+
+      //Keep track of the Next Payload field
+      *nextPayload = &eapPayload->header.nextPayload;
+   }
+
+   //Return status code
+   return error;
+#else
+   //Minimal implementations are not required to support EAP-based
+   //authentication (refer to RFC 7296, section 4)
+   return ERROR_NOT_IMPLEMENTED;
+#endif
 }
 
 #endif

@@ -73,12 +73,6 @@ error_t ikeParseIkeSaInitResponse(IkeSaEntry *sa, const uint8_t *message,
    if(sa->state != IKE_SA_STATE_INIT_RESP)
       return ERROR_UNEXPECTED_MESSAGE;
 
-   //Save the second message (IKE_SA_INIT response), starting with the first
-   //octet of the first SPI in the header and ending with the last octet of
-   //the last payload
-   sa->responderSaInit = message;
-   sa->responderSaInitLen = length;
-
    //Start of exception handling block
    do
    {
@@ -273,6 +267,28 @@ error_t ikeParseIkeSaInitResponse(IkeSaEntry *sa, const uint8_t *message,
       }
 #endif
 
+      //Let g^ir be the Diffie-Hellman shared secret
+      error = ikeComputeSharedSecret(&sa->keContext, sa->sharedSecret,
+         &sa->sharedSecretLen);
+      //Any error to report?
+      if(error)
+         break;
+
+      //At this point in the negotiation, each party can generate a quantity
+      //called SKEYSEED, from which all keys are derived for that IKE SA (refer
+      //to RFC 7296, section 1.2)
+      error = ikeGenerateSaKeyMaterial(sa, NULL);
+      //Any error to report?
+      if(error)
+         break;
+
+      //Save the second message (IKE_SA_INIT response), starting with the first
+      //octet of the first SPI in the header and ending with the last octet of
+      //the last payload
+      osMemcpy(sa->response, message, length);
+      sa->responderSaInit = sa->response;
+      sa->responderSaInitLen = length;
+
       //End of exception handling block
    } while(0);
 
@@ -318,6 +334,7 @@ error_t ikeParseIkeAuthResponse(IkeSaEntry *sa, const uint8_t *message,
 {
    error_t error;
    uint16_t notifyMsgType;
+   IkeEapState eapState;
    IkeMessagePayloads payloads;
    IpsecPadEntry *padEntry;
 
@@ -361,91 +378,139 @@ error_t ikeParseIkeAuthResponse(IkeSaEntry *sa, const uint8_t *message,
          }
       }
 
-      //Mandatory payloads must be included in the received message
-      if(payloads.idr == NULL || payloads.auth == NULL)
+      //Get current EAP state
+      eapState = sa->eapState;
+
+      //Check EAP state
+      if(eapState == IKE_EAP_STATE_DISABLED ||
+         eapState == IKE_EAP_STATE_INIT)
       {
-         error = ERROR_AUTHENTICATION_FAILED;
-         break;
+         //IDr and AUTH payloads must be included in the received message
+         if(payloads.idr == NULL || payloads.auth == NULL)
+         {
+            error = ERROR_AUTHENTICATION_FAILED;
+            break;
+         }
+      }
+      else if(eapState == IKE_EAP_STATE_SUCCESS)
+      {
+         //The EAP AUTH payloads must be included in the two messages following
+         //the one containing the EAP Success message (refer to RFC 7296,
+         //section 2.16)
+         if(payloads.auth == NULL)
+         {
+            error = ERROR_AUTHENTICATION_FAILED;
+            break;
+         }
+      }
+      else
+      {
+         //The EAP payload must be included in the received message
+         if(payloads.eap == NULL)
+         {
+            error = ERROR_AUTHENTICATION_FAILED;
+            break;
+         }
       }
 
-      //Parse Identification payload
-      error = ikeParseIdPayload(sa, payloads.idr);
-      //Malformed Identification payload?
-      if(error)
+      //Check EAP state
+      if(eapState == IKE_EAP_STATE_DISABLED ||
+         eapState == IKE_EAP_STATE_INIT)
       {
-         error = ERROR_AUTHENTICATION_FAILED;
-         break;
-      }
+         //Parse Identification payload
+         error = ikeParseIdPayload(sa, payloads.idr);
+         //Malformed Identification payload?
+         if(error)
+         {
+            error = ERROR_AUTHENTICATION_FAILED;
+            break;
+         }
 
-#if (IKE_NAT_TRAVERSAL_SUPPORT == ENABLED)
-      //Check if the remote endpoint is behind a NAT
-      if(sa->remoteNat)
-      {
-         //Perform ID substitution
-         ikeSubstituteId(sa);
-      }
-#endif
-
-      //Perform lookup in the PAD database based on the ID
-      padEntry = ipsecFindPadEntry(sa->context->netContext->ipsecContext,
-         sa->peerIdType, sa->peerId, sa->peerIdLen);
-      //Invalid ID?
-      if(padEntry == NULL)
-      {
-         error = ERROR_AUTHENTICATION_FAILED;
-         break;
-      }
+         //Perform lookup in the PAD database based on the ID
+         padEntry = ipsecFindPadEntry(sa->context->netContext->ipsecContext,
+            sa->peerId.type, sa->peerId.data, sa->peerId.length);
+         //Invalid ID?
+         if(padEntry == NULL)
+         {
+            error = ERROR_AUTHENTICATION_FAILED;
+            break;
+         }
 
 #if (IKE_CERT_AUTH_SUPPORT == ENABLED)
-      //Check whether a Certificate payload is included
-      if(payloads.cert != NULL)
+         //Certificate-based authentication?
+         if(padEntry->authMethod == IPSEC_AUTH_METHOD_CERT)
+         {
+            //Parse the certificate chain
+            error = ikeParseCertificateChain(sa, padEntry, message, length);
+            //Failed to validate certificate chain?
+            if(error)
+            {
+               error = ERROR_AUTHENTICATION_FAILED;
+               break;
+            }
+         }
+#endif
+
+#if (IKE_INITIAL_CONTACT_SUPPORT == ENABLED)
+         //The INITIAL_CONTACT notification, if sent, must be in the first
+         //IKE_AUTH response, not as a separate exchange afterwards; receiving
+         //parties may ignore it in other messages (refer to RFC 7296,
+         //section 2.4)
+         if(payloads.initialContactNotify)
+         {
+            //The INITIAL_CONTACT notification asserts that this IKE SA is the
+            //only IKE SA currently active between the authenticated identities
+            sa->initialContact = TRUE;
+         }
+#endif
+      }
+
+      //Check EAP state
+      if(eapState == IKE_EAP_STATE_DISABLED ||
+         eapState == IKE_EAP_STATE_INIT ||
+         eapState == IKE_EAP_STATE_SUCCESS)
       {
-         //Parse the certificate chain
-         error = ikeParseCertificateChain(sa, padEntry, message, length);
-         //Failed to validate certificate chain?
+         //The peers are authenticated by having each sign (or MAC using a
+         //shared secret as the key) a block of data (refer to RFC 7296,
+         //section 2.15)
+         error = ikeParseAuthPayload(sa, payloads.auth, payloads.cert);
+         //Authentication failure?
          if(error)
          {
             error = ERROR_AUTHENTICATION_FAILED;
             break;
          }
       }
-#endif
 
-      //The peers are authenticated by having each sign (or MAC using a padded
-      //shared secret as the key, as described later in this section) a block
-      //of data (refer to RFC 7296, section 2.15)
-      error = ikeVerifyAuth(sa, padEntry, payloads.idr, payloads.cert,
-         payloads.auth);
-      //Authentication failure?
-      if(error)
+      //Check EAP state
+      if(eapState == IKE_EAP_STATE_DISABLED ||
+         eapState == IKE_EAP_STATE_SUCCESS)
       {
-         error = ERROR_AUTHENTICATION_FAILED;
-         break;
+         //Child SAs can be created either by being piggybacked on the IKE_AUTH
+         //exchange, or using a separate CREATE_CHILD_SA exchange
+         if(sa->childSa1 != NULL)
+         {
+            //The responder completes negotiation of a Child SA with additional
+            //fields
+            error = ikeProcessInitialChildSaCreateResponse(sa, &payloads);
+            //Any error to report?
+            if(error)
+               break;
+         }
+
       }
-
-      //Child SAs can be created either by being piggybacked on the IKE_AUTH
-      //exchange, or using a separate CREATE_CHILD_SA exchange
-      if(sa->childSa1 != NULL)
+      else
       {
-         //The responder completes negotiation of a Child SA with additional
-         //fields
-         error = ikeProcessInitialChildSaCreateResponse(sa, &payloads);
-         //Any error to report?
+         //The Extensible Authentication Protocol payload allows IKE SAs to be
+         //authenticated using the EAP protocol
+         error = ikeParseEapPayload(sa, payloads.eap);
+         //Authentication failure?
          if(error)
+         {
+            error = ERROR_AUTHENTICATION_FAILED;
             break;
+         }
       }
-
-#if (IKE_INITIAL_CONTACT_SUPPORT == ENABLED)
-      //The INITIAL_CONTACT notification asserts that this IKE SA is the only
-      //IKE SA currently active between the authenticated identities
-      if(payloads.initialContactNotify)
-      {
-         //It may be sent when an IKE SA is established after a crash, and the
-         //recipient may use this information to delete any other IKE SAs it
-         //has to the same authenticated identity without waiting for a timeout
-         ikeDeleteDuplicateSaEntries(sa);
-      }
-#endif
 
       //End of exception handling block
    } while(0);
@@ -453,48 +518,93 @@ error_t ikeParseIkeAuthResponse(IkeSaEntry *sa, const uint8_t *message,
    //Check status code
    if(error == NO_ERROR)
    {
-      //The initiator has received the IKE_AUTH response
-      ikeChangeSaState(sa, IKE_SA_STATE_OPEN);
-
-      //Successful Child SA creation?
-      if(sa->childSa1 != NULL)
+      //Check EAP state
+      if(eapState == IKE_EAP_STATE_DISABLED ||
+         eapState == IKE_EAP_STATE_SUCCESS)
       {
-         //Update the state of the Child SA
-         ikeChangeChildSaState(sa->childSa1, IKE_CHILD_SA_STATE_OPEN);
+         //Release Diffie-Hellman context
+         ikeFreeKeContext(&sa->keContext);
+         ikeInitKeContext(&sa->keContext);
 
-         //ESP and AH SAs exist in pairs (one in each direction), so two SAs
-         //are created in a single Child SA negotiation for them
-         ikeCreateIpsecSaPair(sa->childSa1);
-      }
+#if (IKE_EAP_AUTH_SUPPORT == ENABLED)
+         //Erase master session key
+         cryptoZeroizeMem(sa->msk, sizeof(sa->msk));
+         sa->mskLen = 0;
+#endif
+         //If authentication has succeeded in the IKE_AUTH exchange, the IKE SA
+         //is established (refer to RFC 7296, section 2.21.2)
+         ikeChangeSaState(sa, IKE_SA_STATE_OPEN);
+
+         //Successful Child SA creation?
+         if(sa->childSa1 != NULL)
+         {
+            //Update the state of the Child SA
+            ikeChangeChildSaState(sa->childSa1, IKE_CHILD_SA_STATE_OPEN);
+
+            //ESP and AH SAs exist in pairs (one in each direction), so two SAs
+            //are created in a single Child SA negotiation for them
+            ikeCreateIpsecSaPair(sa->childSa1);
+         }
+
+#if (IKE_INITIAL_CONTACT_SUPPORT == ENABLED)
+         //The INITIAL_CONTACT notification asserts that this IKE SA is the only
+         //IKE SA currently active between the authenticated identities
+         if(sa->initialContact)
+         {
+            //Delete duplicate IKE SAs
+            ikeDeleteDuplicateSaEntries(sa);
+         }
+#endif
 
 #if (IKE_REAUTH_SUPPORT == ENABLED)
-      //Check whether reauthentication is on-going
-      if(sa->oldSa != NULL)
-      {
-         //IKEv2 does not have any special support for reauthentication.
-         //Reauthentication is done by creating a new IKE SA from scratch,
-         //creating new Child SAs within the new IKE SA, and finally deleting
-         //the old IKE SA
-         ikeProcessSaDeleteEvent(sa->oldSa);
+         //Check whether reauthentication is on-going
+         if(sa->oldSa != NULL && sa->oldSa->state != IKE_SA_STATE_CLOSED)
+         {
+            //IKEv2 does not have any special support for reauthentication.
+            //Reauthentication is done by creating a new IKE SA from scratch,
+            //creating new Child SAs within the new IKE SA, and finally deleting
+            //the old IKE SA
+            ikeProcessSaDeleteEvent(sa->oldSa);
 
-         //Detach the old IKE SA
-         sa->oldSa = NULL;
-      }
+            //Detach the old IKE SA
+            sa->oldSa = NULL;
+         }
 #endif
+      }
+      else
+      {
+         //EAP authentication is on-going
+         ikeChangeSaState(sa, IKE_SA_STATE_AUTH_REQ);
+
+         //Send the next IKE_AUTH message
+         ikeSendIkeAuthRequest(sa);
+      }
    }
    else if(error == ERROR_AUTHENTICATION_FAILED)
    {
-      //All errors causing the authentication to fail for whatever reason
-      //(invalid shared secret, invalid ID, untrusted certificate issuer,
-      //revoked or expired certificate, etc.) should result in an
-      //AUTHENTICATION_FAILED notification
-      ikeChangeSaState(sa, IKE_SA_STATE_AUTH_FAILURE_REQ);
+      //EAP failure?
+      if(sa->eapState == IKE_EAP_STATE_FAILURE)
+      {
+         //If the exchange is terminated with EAP Failure, an
+         //AUTHENTICATION_FAILED notification is not sent (refer to RFC 7296,
+         //section 2.21)
+         ikeDeleteSaEntry(sa);
+      }
+      else
+      {
+         //All errors causing the authentication to fail for whatever reason
+         //(invalid shared secret, invalid ID, untrusted certificate issuer,
+         //revoked or expired certificate, etc.) should result in an
+         //AUTHENTICATION_FAILED notification
+         ikeChangeSaState(sa, IKE_SA_STATE_AUTH_FAILURE_REQ);
 
-      //If the error occurs on the initiator, the notification may be returned
-      //in a separate INFORMATIONAL exchange, usually with no other payloads.
-      //This is an exception for the general rule of not starting new exchanges
-      //based on errors in responses (refer to RFC 7296, section 2.21.2)
-      ikeSendInfoRequest(sa);
+         //If the error occurs on the initiator, the notification may be
+         //returned in a separate INFORMATIONAL exchange, usually with no other
+         //payloads. This is an exception for the general rule of not starting
+         //new exchanges based on errors in responses (refer to RFC 7296,
+         //section 2.21.2)
+         ikeSendInfoRequest(sa);
+      }
    }
    else
    {
@@ -966,8 +1076,7 @@ error_t ikeProcessChildSaCreateResponse(IkeSaEntry *sa,
       if(error)
          return error;
 
-      //The ephemeral private key must be destroyed as soon as possible (refer
-      //to RFC 9206, section 10)
+      //Release Diffie-Hellman context
       ikeFreeKeContext(&childSa->keContext);
       ikeInitKeContext(&childSa->keContext);
    }
@@ -1172,8 +1281,7 @@ error_t ikeProcessChildSaRekeyResponse(IkeSaEntry *sa,
       if(error)
          return error;
 
-      //The ephemeral private key must be destroyed as soon as possible (refer
-      //to RFC 9206, section 10)
+      //Release Diffie-Hellman context
       ikeFreeKeContext(&childSa->keContext);
       ikeInitKeContext(&childSa->keContext);
    }
@@ -1396,8 +1504,7 @@ error_t ikeProcessIkeSaRekeyResponse(IkeSaEntry *sa,
    if(error)
       return error;
 
-   //The ephemeral private key must be destroyed as soon as possible (refer to
-   //RFC 9206, section 10)
+   //Release Diffie-Hellman context
    ikeFreeKeContext(&newSa->keContext);
    ikeInitKeContext(&newSa->keContext);
 

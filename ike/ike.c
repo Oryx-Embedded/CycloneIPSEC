@@ -449,53 +449,101 @@ error_t ikeSetPreferredGroup(IkeContext *context, uint16_t groupNum)
 error_t ikeSetId(IkeContext *context, IkeIdType idType, const void *id,
    size_t idLen)
 {
+   error_t error;
+
    //Check parameters
-   if(context == NULL || id == NULL)
+   if(context == NULL || idType == IKE_ID_TYPE_INVALID)
       return ERROR_INVALID_PARAMETER;
 
    //Check the length of the identification data
    if(idLen > IKE_MAX_ID_LEN)
       return ERROR_INVALID_LENGTH;
 
-   //Save identification data
-   context->idType = idType;
-   osMemcpy(context->id, id, idLen);
-   context->idLen = idLen;
+   //Initialize status code
+   error = NO_ERROR;
 
-   //Successful processing
-   return NO_ERROR;
+   //Clear identification data
+   osMemset(&context->id, 0, sizeof(IkeId));
+
+   //Valid identification data?
+   if(id != NULL && idLen > 0)
+   {
+      //Save identification type
+      context->id.type = idType;
+
+      //Save identification data
+      osMemcpy(context->id.data, id, idLen);
+      context->id.length = idLen;
+   }
+   else
+   {
+#if (IKE_CERT_AUTH_SUPPORT == ENABLED)
+      //X.500 distinguished name?
+      if(idType == IKE_ID_TYPE_DER_ASN1_DN)
+      {
+         size_t n;
+
+         //The first pass calculates the length of the subject's DN
+         error = ikeGetCertSubjectDn(context->certChain, context->certChainLen,
+            NULL, &n);
+
+         //Check status code
+         if(!error)
+         {
+            //Check the length of the subject's DN
+            if(n <= IKE_MAX_ID_LEN)
+            {
+               //The second pass extracts the subject's DN from the certificate
+               error = ikeGetCertSubjectDn(context->certChain,
+                  context->certChainLen, context->id.data, &n);
+            }
+            else
+            {
+               //Report an error
+               error = ERROR_BUFFER_OVERFLOW;
+            }
+         }
+
+         //Check status code
+         if(!error)
+         {
+            //Save identification type
+            context->id.type = idType;
+            //Save the length of the identification data
+            context->id.length = n;
+         }
+      }
+      else
+#endif
+      {
+         //Report an error
+         error = ERROR_INVALID_PARAMETER;
+      }
+   }
+
+   //Return status code
+   return error;
 }
 
 
 /**
- * @brief Set entity's pre-shared key
+ * @brief Set authentication method
  * @param[in] context Pointer to the IKE context
- * @param[in] psk Pointer to the pre-shared key
- * @param[in] pskLen Length of the pre-shared key, in bytes
+ * @param[in] authMethod Authentication method (certificate, PSK or EAP)
  * @return Error code
  **/
 
-error_t ikeSetPsk(IkeContext *context, const uint8_t *psk, size_t pskLen)
+error_t ikeSetAuthMethod(IkeContext *context, IpsecAuthMethod authMethod)
 {
-#if (IKE_PSK_AUTH_SUPPORT == ENABLED)
-   //Check parameters
-   if(context == NULL || psk == NULL)
+   //Make sure the IKE context is valid
+   if(context == NULL)
       return ERROR_INVALID_PARAMETER;
 
-   //Check the length of the pre-shared key
-   if(pskLen > IKE_MAX_PSK_LEN)
-      return ERROR_INVALID_LENGTH;
-
-   //Save pre-shared key
-   osMemcpy(context->psk, psk, pskLen);
-   context->pskLen = pskLen;
+   //Save authentication method
+   context->authMethod = authMethod;
 
    //Successful processing
    return NO_ERROR;
-#else
-   //Pre-shared key authentication is not supported
-   return ERROR_NOT_IMPLEMENTED;
-#endif
 }
 
 
@@ -609,14 +657,17 @@ error_t ikeSetCertificate(IkeContext *context, const char_t *certChain,
       context->privateKey = privateKey;
       context->privateKeyLen = privateKeyLen;
 
+      //Erase the existing password, if any
+      cryptoZeroizeMem(context->privateKeyPassword, IKE_MAX_PASSWORD_LEN);
+
       //The password if required only for encrypted private keys
       if(password != NULL)
       {
-         osStrcpy(context->password, password);
+         osStrcpy(context->privateKeyPassword, password);
       }
       else
       {
-         osStrcpy(context->password, "");
+         osStrcpy(context->privateKeyPassword, "");
       }
    }
 
@@ -626,6 +677,119 @@ error_t ikeSetCertificate(IkeContext *context, const char_t *certChain,
    //Certificate authentication is not supported
    return ERROR_NOT_IMPLEMENTED;
 #endif
+}
+
+
+/**
+ * @brief Set entity's pre-shared key
+ * @param[in] context Pointer to the IKE context
+ * @param[in] psk Pointer to the pre-shared key
+ * @param[in] pskLen Length of the pre-shared key, in bytes
+ * @return Error code
+ **/
+
+error_t ikeSetPsk(IkeContext *context, const uint8_t *psk, size_t pskLen)
+{
+#if (IKE_PSK_AUTH_SUPPORT == ENABLED)
+   //Check parameters
+   if(context == NULL || psk == NULL)
+      return ERROR_INVALID_PARAMETER;
+
+   //Check the length of the pre-shared key
+   if(pskLen > IKE_MAX_PSK_LEN)
+      return ERROR_INVALID_LENGTH;
+
+   //Save pre-shared key
+   osMemcpy(context->psk, psk, pskLen);
+   context->pskLen = pskLen;
+
+   //Successful processing
+   return NO_ERROR;
+#else
+   //Pre-shared key authentication is not supported
+   return ERROR_NOT_IMPLEMENTED;
+#endif
+}
+
+
+/**
+ * @brief Set user name
+ * @param[in] context Pointer to the IKE context
+ * @param[in] username NULL-terminated string containing the user name
+ * @return Error code
+ **/
+
+error_t ikeSetUsername(IkeContext *context, const char_t *username)
+{
+#if (IKE_EAP_AUTH_SUPPORT == ENABLED)
+   //Check parameters
+   if(context == NULL || username == NULL)
+      return ERROR_INVALID_PARAMETER;
+
+   //Make sure the length of the user name is acceptable
+   if(osStrlen(username) > IKE_MAX_USERNAME_LEN)
+      return ERROR_INVALID_LENGTH;
+
+   //Save user name
+   osStrcpy(context->username, username);
+
+   //Successful processing
+   return NO_ERROR;
+#else
+   //Not implemented
+   return ERROR_NOT_IMPLEMENTED;
+#endif
+}
+
+
+/**
+ * @brief Set password
+ * @param[in] context Pointer to the IKE context
+ * @param[in] password NULL-terminated string containing the password
+ * @return Error code
+ **/
+
+error_t ikeSetPassword(IkeContext *context, const char_t *password)
+{
+#if (IKE_EAP_AUTH_SUPPORT == ENABLED)
+   //Check parameters
+   if(context == NULL || password == NULL)
+      return ERROR_INVALID_PARAMETER;
+
+   //Make sure the length of the password is acceptable
+   if(osStrlen(password) > IKE_MAX_PASSWORD_LEN)
+      return ERROR_INVALID_LENGTH;
+
+   //Erase the existing password, if any
+   cryptoZeroizeMem(context->password, IKE_MAX_PASSWORD_LEN);
+   //Save the new password
+   osStrcpy(context->password, password);
+
+   //Successful processing
+   return NO_ERROR;
+#else
+   //Not implemented
+   return ERROR_NOT_IMPLEMENTED;
+#endif
+}
+
+
+/**
+ * @brief Request the specified configuration attribute from the server
+ * @param[in] context Pointer to the IKE context
+ * @param[in] type Configuration attribute type
+ * @param[in] enable Specifies whether the specified configuration attribute
+ *   is requested
+ * @return Error code
+ **/
+
+error_t ikeRequestConfigAttribute(IkeContext *context, IkeConfigAttrType type,
+   bool_t enable)
+{
+   //Minimal implementations are not required to support the ability to request
+   //a temporary IP address on the remote end of a tunnel (refer to RFC 7296,
+   //section 4)
+   return ERROR_NOT_IMPLEMENTED;
 }
 
 
@@ -854,6 +1018,7 @@ error_t ikeCreateChildSa(IkeContext *context, const IpsecPacketInfo *packet)
    childSa->remoteIpAddr = remoteIpAddr;
    childSa->mode = spdEntry->mode;
    childSa->protocol = spdEntry->protocol;
+   childSa->esn = spdEntry->esn;
 #if (IKE_CHILD_SA_PFS_SUPPORT == ENABLED)
    childSa->pfs = spdEntry->pfs;
 #endif
@@ -1091,7 +1256,7 @@ void ikeDeinit(IkeContext *context)
       osDeleteEvent(&context->event);
 
       //Clear IKE context
-      osMemset(context, 0, sizeof(IkeContext));
+      cryptoZeroizeMem(context, sizeof(IkeContext));
    }
 }
 

@@ -226,19 +226,6 @@ static const uint16_t espSupportedAuthAlgos[] =
 
 
 /**
- * @brief List of supported ESN transforms
- **/
-
-static const uint16_t espSupportedEsnTranforms[] =
-{
-#if (ESP_ESN_SUPPORT == ENABLED)
-   IKE_TRANSFORM_ID_ESN_YES,
-#endif
-   IKE_TRANSFORM_ID_ESN_NO
-};
-
-
-/**
  * @brief Select the relevant encryption algorithm
  * @param[in] childSa Pointer to the Child SA
  * @param[in] encAlgoId Encryption algorithm identifier
@@ -374,7 +361,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_CCM;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 16;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 3;
       childSa->ivLen = 8;
       childSa->icvLen = 8;
@@ -388,7 +374,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_CCM;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 24;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 3;
       childSa->ivLen = 8;
       childSa->icvLen = 8;
@@ -402,7 +387,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_CCM;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 32;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 3;
       childSa->ivLen = 8;
       childSa->icvLen = 8;
@@ -416,7 +400,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_CCM;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 16;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 3;
       childSa->ivLen = 8;
       childSa->icvLen = 12;
@@ -430,7 +413,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_CCM;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 24;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 3;
       childSa->ivLen = 8;
       childSa->icvLen = 12;
@@ -444,7 +426,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_CCM;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 32;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 3;
       childSa->ivLen = 8;
       childSa->icvLen = 12;
@@ -458,7 +439,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_CCM;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 16;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 3;
       childSa->ivLen = 8;
       childSa->icvLen = 16;
@@ -472,7 +452,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_CCM;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 24;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 3;
       childSa->ivLen = 8;
       childSa->icvLen = 16;
@@ -486,7 +465,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_CCM;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 32;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 3;
       childSa->ivLen = 8;
       childSa->icvLen = 16;
@@ -500,7 +478,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_GCM;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 16;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 4;
       childSa->ivLen = 8;
       childSa->icvLen = 8;
@@ -514,7 +491,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_GCM;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 24;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 4;
       childSa->ivLen = 8;
       childSa->icvLen = 8;
@@ -528,7 +504,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_GCM;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 32;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 4;
       childSa->ivLen = 8;
       childSa->icvLen = 8;
@@ -542,7 +517,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_GCM;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 16;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 4;
       childSa->ivLen = 8;
       childSa->icvLen = 12;
@@ -556,7 +530,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_GCM;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 24;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 4;
       childSa->ivLen = 8;
       childSa->icvLen = 12;
@@ -570,7 +543,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_GCM;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 32;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 4;
       childSa->ivLen = 8;
       childSa->icvLen = 12;
@@ -584,7 +556,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_GCM;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 16;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 4;
       childSa->ivLen = 8;
       childSa->icvLen = 16;
@@ -598,7 +569,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_GCM;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 24;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 4;
       childSa->ivLen = 8;
       childSa->icvLen = 16;
@@ -612,7 +582,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_GCM;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 32;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 4;
       childSa->ivLen = 8;
       childSa->icvLen = 16;
@@ -695,7 +664,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_CCM;
       childSa->cipherAlgo = CAMELLIA_CIPHER_ALGO;
       childSa->encKeyLen = 16;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 3;
       childSa->ivLen = 8;
       childSa->icvLen = 8;
@@ -709,7 +677,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_CCM;
       childSa->cipherAlgo = CAMELLIA_CIPHER_ALGO;
       childSa->encKeyLen = 24;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 3;
       childSa->ivLen = 8;
       childSa->icvLen = 8;
@@ -723,7 +690,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_CCM;
       childSa->cipherAlgo = CAMELLIA_CIPHER_ALGO;
       childSa->encKeyLen = 32;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 3;
       childSa->ivLen = 8;
       childSa->icvLen = 8;
@@ -737,7 +703,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_CCM;
       childSa->cipherAlgo = CAMELLIA_CIPHER_ALGO;
       childSa->encKeyLen = 16;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 3;
       childSa->ivLen = 8;
       childSa->icvLen = 12;
@@ -751,7 +716,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_CCM;
       childSa->cipherAlgo = CAMELLIA_CIPHER_ALGO;
       childSa->encKeyLen = 24;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 3;
       childSa->ivLen = 8;
       childSa->icvLen = 12;
@@ -765,7 +729,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_CCM;
       childSa->cipherAlgo = CAMELLIA_CIPHER_ALGO;
       childSa->encKeyLen = 32;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 3;
       childSa->ivLen = 8;
       childSa->icvLen = 12;
@@ -779,7 +742,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_CCM;
       childSa->cipherAlgo = CAMELLIA_CIPHER_ALGO;
       childSa->encKeyLen = 16;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 3;
       childSa->ivLen = 8;
       childSa->icvLen = 16;
@@ -793,7 +755,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_CCM;
       childSa->cipherAlgo = CAMELLIA_CIPHER_ALGO;
       childSa->encKeyLen = 24;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 3;
       childSa->ivLen = 8;
       childSa->icvLen = 16;
@@ -807,7 +768,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_CCM;
       childSa->cipherAlgo = CAMELLIA_CIPHER_ALGO;
       childSa->encKeyLen = 32;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 3;
       childSa->ivLen = 8;
       childSa->icvLen = 16;
@@ -821,7 +781,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_CHACHA20_POLY1305;
       childSa->cipherAlgo = NULL;
       childSa->encKeyLen = 32;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 4;
       childSa->ivLen = 8;
       childSa->icvLen = 16;
@@ -836,7 +795,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_GMAC;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 16;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 4;
       childSa->ivLen = 8;
       childSa->icvLen = 16;
@@ -852,7 +810,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_GMAC;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 24;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 4;
       childSa->ivLen = 8;
       childSa->icvLen = 16;
@@ -867,7 +824,6 @@ error_t espSelectEncAlgo(IkeChildSaEntry *childSa, uint16_t encAlgoId,
       childSa->cipherMode = CIPHER_MODE_GMAC;
       childSa->cipherAlgo = AES_CIPHER_ALGO;
       childSa->encKeyLen = 32;
-      childSa->authKeyLen = 0;
       childSa->saltLen = 4;
       childSa->ivLen = 8;
       childSa->icvLen = 16;
@@ -904,7 +860,6 @@ error_t espSelectAuthAlgo(IkeChildSaEntry *childSa, uint16_t authAlgoId)
    if(authAlgoId == IKE_TRANSFORM_ID_AUTH_AES_CMAC_96)
    {
       childSa->authMacAlgo = MAC_ALGO_CMAC;
-      childSa->authHashAlgo = NULL;
       childSa->authCipherAlgo = AES_CIPHER_ALGO;
       childSa->authKeyLen = 16;
       childSa->icvLen = 12;
@@ -917,7 +872,6 @@ error_t espSelectAuthAlgo(IkeChildSaEntry *childSa, uint16_t authAlgoId)
    {
       childSa->authMacAlgo = MAC_ALGO_HMAC;
       childSa->authHashAlgo = MD5_HASH_ALGO;
-      childSa->authCipherAlgo = NULL;
       childSa->authKeyLen = MD5_DIGEST_SIZE;
       childSa->icvLen = 12;
    }
@@ -929,7 +883,6 @@ error_t espSelectAuthAlgo(IkeChildSaEntry *childSa, uint16_t authAlgoId)
    {
       childSa->authMacAlgo = MAC_ALGO_HMAC;
       childSa->authHashAlgo = SHA1_HASH_ALGO;
-      childSa->authCipherAlgo = NULL;
       childSa->authKeyLen = SHA1_DIGEST_SIZE;
       childSa->icvLen = 12;
    }
@@ -941,7 +894,6 @@ error_t espSelectAuthAlgo(IkeChildSaEntry *childSa, uint16_t authAlgoId)
    {
       childSa->authMacAlgo = MAC_ALGO_HMAC;
       childSa->authHashAlgo = SHA256_HASH_ALGO;
-      childSa->authCipherAlgo = NULL;
       childSa->authKeyLen = SHA256_DIGEST_SIZE;
       childSa->icvLen = 16;
    }
@@ -953,7 +905,6 @@ error_t espSelectAuthAlgo(IkeChildSaEntry *childSa, uint16_t authAlgoId)
    {
       childSa->authMacAlgo = MAC_ALGO_HMAC;
       childSa->authHashAlgo = SHA384_HASH_ALGO;
-      childSa->authCipherAlgo = NULL;
       childSa->authKeyLen = SHA384_DIGEST_SIZE;
       childSa->icvLen = 24;
    }
@@ -965,7 +916,6 @@ error_t espSelectAuthAlgo(IkeChildSaEntry *childSa, uint16_t authAlgoId)
    {
       childSa->authMacAlgo = MAC_ALGO_HMAC;
       childSa->authHashAlgo = SHA512_HASH_ALGO;
-      childSa->authCipherAlgo = NULL;
       childSa->authKeyLen = SHA512_DIGEST_SIZE;
       childSa->icvLen = 32;
    }
@@ -1029,7 +979,7 @@ error_t espAddSupportedTransforms(IkeChildSaEntry *childSa,
       //An initiator who supports ESNs will usually include two ESN transforms,
       //with values "0" and "1", in its proposals (refer to RFC 7296,
       //section 3.3.2)
-      error = espAddSupportedEsnTransforms(childSa, proposal, lastSubstruc);
+      error = espAddSupportedSnTransforms(childSa, proposal, lastSubstruc);
    }
 
    //Return status code
@@ -1099,28 +1049,41 @@ error_t espAddSupportedAuthTransforms(IkeChildSaEntry *childSa,
 
 
 /**
- * @brief Add the supported ESN transforms to the proposal
+ * @brief Add the supported SN transforms to the proposal
  * @param[in] childSa Pointer to the Child SA
  * @param[in,out] proposal Pointer to the Proposal substructure
  * @param[in,out] lastSubstruc Pointer to the Last Substruc field
  * @return Error code
  **/
 
-error_t espAddSupportedEsnTransforms(IkeChildSaEntry *childSa,
+error_t espAddSupportedSnTransforms(IkeChildSaEntry *childSa,
    IkeProposal *proposal, uint8_t **lastSubstruc)
 {
    error_t error;
-   uint_t i;
 
    //Initialize status code
    error = NO_ERROR;
 
-   //Loop through the list of supported ESN transforms
-   for(i = 0; i < arraysize(espSupportedEsnTranforms) && !error; i++)
+#if (ESP_ESN_SUPPORT == ENABLED)
+   //Check whether extended sequence numbers are preferred
+   if(childSa->esn)
    {
-      //Add a new transform to the proposal
-      error = ikeAddTransform(IKE_TRANSFORM_TYPE_ESN,
-         espSupportedEsnTranforms[i], 0, proposal, lastSubstruc);
+      //Transform ID 1 defines sequence numbers as monotonically increasing
+      //64-bit counters. The low-order 32 bits are transmitted in the Sequence
+      //Number field of ESP packets (refer to RFC 9827, section 3)
+      error = ikeAddTransform(IKE_TRANSFORM_TYPE_SN, IKE_TRANSFORM_ID_SN_64BIT,
+         0, proposal, lastSubstruc);
+   }
+#endif
+
+   //Check status code
+   if(!error)
+   {
+      //Transform ID 0 defines sequence numbers as monotonically increasing
+      //32-bit counters that are transmitted in the Sequence Number field of
+      //ESP packets
+      error = ikeAddTransform(IKE_TRANSFORM_TYPE_SN, IKE_TRANSFORM_ID_SN_32BIT,
+         0, proposal, lastSubstruc);
    }
 
    //Return status code
@@ -1140,102 +1103,21 @@ const IkeEncAlgo *espSelectEncTransform(IkeChildSaEntry *childSa,
    const IkeProposal *proposal, size_t proposalLen)
 {
    uint_t i;
-   uint_t j;
-   size_t n;
-   size_t length;
-   uint8_t *p;
-   uint16_t transformId;
    const IkeEncAlgo *selectedAlgo;
-   const IkeTransform *transform;
-   const IkeTransformAttr *attr;
 
    //Chosen algorithm
    selectedAlgo = NULL;
 
-   //Check the length of the Proposal substructure
-   if(proposalLen >= sizeof(IkeProposal) &&
-      proposalLen >= (sizeof(IkeProposal) + proposal->spiSize))
+   //Loop through the list of algorithms supported by the entity
+   for(i = 0; i < arraysize(espSupportedEncAlgos); i++)
    {
-      //Loop through the list of algorithms supported by the entity
-      for(i = 0; i < arraysize(espSupportedEncAlgos) && selectedAlgo == NULL; i++)
+      //Search the list of algorithms supported by the peer for a matching
+      //transform
+      if(ikeFindTranform(IKE_TRANSFORM_TYPE_ENCR, espSupportedEncAlgos[i].id,
+         espSupportedEncAlgos[i].keyLen * 8, proposal, proposalLen))
       {
-         //Get the length of the Proposal substructure
-         length = proposalLen - sizeof(IkeProposal) - proposal->spiSize;
-         //Point to the first Transform substructure
-         p = (uint8_t *) proposal + sizeof(IkeProposal) + proposal->spiSize;
-
-         //Loop through the list of algorithms supported by the peer
-         for(j = 0; j < proposal->numTransforms && selectedAlgo == NULL; j++)
-         {
-            //Malformed substructure?
-            if(length < sizeof(IkeTransform))
-               break;
-
-            //Point to the Transform substructure
-            transform = (IkeTransform *) p;
-
-            //The Transform Length field indicates the length of the Transform
-            //substructure including header and attributes
-            n = ntohs(transform->transformLength);
-
-            //Check the length of the transform
-            if(n < sizeof(IkeTransform) || n > length)
-               break;
-
-            //Check transform type
-            if(transform->transformType == IKE_TRANSFORM_TYPE_ENCR)
-            {
-               //Convert the Transform ID field to host byte order
-               transformId = ntohs(transform->transformId);
-
-               //Variable-length key encryption algorithm?
-               if(ikeIsVariableLengthKeyEncAlgo(transformId))
-               {
-                  //For algorithms that accept a variable-length key, a fixed
-                  //key size must be specified as part of the cryptographic
-                  //transform negotiated (refer to RFC 7296, section 2.13)
-                  if(n == (sizeof(IkeTransform) + sizeof(IkeTransformAttr)))
-                  {
-                     //Point to the transform attribute
-                     attr = (IkeTransformAttr *) transform->transformAttr;
-
-                     //Check attribute format and type
-                     if(ntohs(attr->type) == ((uint16_t) IKE_ATTR_FORMAT_TV |
-                        (uint16_t) IKE_TRANSFORM_ATTR_TYPE_KEY_LEN))
-                     {
-                        //Check transform identifier and key length
-                        if(transformId == espSupportedEncAlgos[i].id &&
-                           ntohs(attr->length) == (espSupportedEncAlgos[i].keyLen * 8))
-                        {
-                           selectedAlgo = &espSupportedEncAlgos[i];
-                        }
-                     }
-                  }
-               }
-               else
-               {
-                  //The Key Length attribute must not be used with transforms
-                  //that use a fixed-length key (refer to RFC 7296, section 3.3.5)
-                  if(n == sizeof(IkeTransform))
-                  {
-                     //Check transform identifier
-                     if(transformId == espSupportedEncAlgos[i].id)
-                     {
-                        selectedAlgo = &espSupportedEncAlgos[i];
-                     }
-                  }
-               }
-            }
-
-            //The Last Substruc field has a value of 0 if this was the last
-            //Transform Substructure
-            if(transform->lastSubstruc == IKE_LAST_SUBSTRUC_LAST)
-               break;
-
-            //Jump to the next Transform substructure
-            p += n;
-            length -= n;
-         }
+         selectedAlgo = &espSupportedEncAlgos[i];
+         break;
       }
    }
 
@@ -1262,19 +1144,51 @@ uint16_t espSelectAuthTransform(IkeChildSaEntry *childSa,
 
 
 /**
- * @brief ESN transform negotiation
+ * @brief SN transform negotiation
  * @param[in] childSa Pointer to the Child SA
  * @param[in] proposal Pointer to the Proposal substructure
  * @param[in] proposalLen Length of the Proposal substructure, in bytes
- * @return Selected ESN transform, if any
+ * @return Selected SN transform, if any
  **/
 
-uint16_t espSelectEsnTransform(IkeChildSaEntry *childSa,
+uint16_t espSelectSnTransform(IkeChildSaEntry *childSa,
    const IkeProposal *proposal, size_t proposalLen)
 {
-   //Select the ESN transform to use
-   return ikeSelectTransform(IKE_TRANSFORM_TYPE_ESN, espSupportedEsnTranforms,
-      arraysize(espSupportedEsnTranforms), proposal, proposalLen);
+   uint16_t transformId;
+
+   //Chosen SN transform
+   transformId = IKE_TRANSFORM_ID_INVALID;
+
+#if (ESP_ESN_SUPPORT == ENABLED)
+   //Check whether extended sequence numbers are preferred
+   if(childSa->esn)
+   {
+      //Transform ID 1 defines sequence numbers as monotonically increasing
+      //64-bit counters. The low-order 32 bits are transmitted in the Sequence
+      //Number field of ESP packets (refer to RFC 9827, section 3)
+      if(ikeFindTranform(IKE_TRANSFORM_TYPE_SN, IKE_TRANSFORM_ID_SN_64BIT, 0,
+         proposal, proposalLen))
+      {
+         transformId = IKE_TRANSFORM_ID_SN_64BIT;
+      }
+   }
+#endif
+
+   //Invalid SN transform?
+   if(transformId == IKE_TRANSFORM_ID_INVALID)
+   {
+      //Transform ID 0 defines sequence numbers as monotonically increasing
+      //32-bit counters that are transmitted in the Sequence Number field of
+      //ESP packets
+      if(ikeFindTranform(IKE_TRANSFORM_TYPE_SN, IKE_TRANSFORM_ID_SN_32BIT, 0,
+         proposal, proposalLen))
+      {
+         transformId = IKE_TRANSFORM_ID_SN_32BIT;
+      }
+   }
+
+   //Return the chosen SN transform, if any
+   return transformId;
 }
 
 
@@ -1300,7 +1214,7 @@ error_t espSelectSaProposal(IkeChildSaEntry *childSa,
    childSa->encAlgoId = IKE_TRANSFORM_ID_INVALID;
    childSa->encKeyLen = 0;
    childSa->authAlgoId = IKE_TRANSFORM_ID_INVALID;
-   childSa->esn = IKE_TRANSFORM_ID_INVALID;
+   childSa->snId = IKE_TRANSFORM_ID_INVALID;
 #if (IKE_CHILD_SA_PFS_SUPPORT == ENABLED)
    childSa->keContext.groupNum = IKE_TRANSFORM_ID_KE_NONE;
 #endif
@@ -1387,13 +1301,13 @@ error_t espSelectSaProposal(IkeChildSaEntry *childSa,
                   n);
             }
 
-            //ESN transform negotiation
-            childSa->esn = espSelectEsnTransform(childSa, proposal, n);
+            //SN transform negotiation
+            childSa->snId = espSelectSnTransform(childSa, proposal, n);
 
             //Unacceptable proposal?
             if(childSa->encAlgoId == IKE_TRANSFORM_ID_INVALID ||
                childSa->authAlgoId == IKE_TRANSFORM_ID_INVALID ||
-               childSa->esn == IKE_TRANSFORM_ID_INVALID)
+               childSa->snId == IKE_TRANSFORM_ID_INVALID)
             {
                error = ERROR_INVALID_PROPOSAL;
             }
@@ -1465,7 +1379,7 @@ error_t espCheckSaProposal(IkeChildSaEntry *childSa,
    childSa->encAlgoId = IKE_TRANSFORM_ID_INVALID;
    childSa->encKeyLen = 0;
    childSa->authAlgoId = IKE_TRANSFORM_ID_INVALID;
-   childSa->esn = IKE_TRANSFORM_ID_INVALID;
+   childSa->snId = IKE_TRANSFORM_ID_INVALID;
 
    //Retrieve the length of the SA payload
    length = ntohs(payload->header.payloadLength);
@@ -1515,7 +1429,7 @@ error_t espCheckSaProposal(IkeChildSaEntry *childSa,
    //The accepted cryptographic suite must contain exactly one transform of
    //each type included in the proposal (refer to RFC 7296, section 2.7)
    if(ikeGetNumTransforms(IKE_TRANSFORM_TYPE_ENCR, proposal, n) != 1 ||
-      ikeGetNumTransforms(IKE_TRANSFORM_TYPE_ESN, proposal, n) != 1)
+      ikeGetNumTransforms(IKE_TRANSFORM_TYPE_SN, proposal, n) != 1)
    {
       return ERROR_INVALID_PROPOSAL;
    }
@@ -1552,15 +1466,15 @@ error_t espCheckSaProposal(IkeChildSaEntry *childSa,
       childSa->authAlgoId = espSelectAuthTransform(childSa, proposal, n);
    }
 
-   //Get the selected ESN transform
-   childSa->esn = espSelectEsnTransform(childSa, proposal, n);
+   //Get the selected SN transform
+   childSa->snId = espSelectSnTransform(childSa, proposal, n);
 
    //The initiator of an exchange must check that the accepted offer is
    //consistent with one of its proposals, and if not must terminate the
    //exchange (refer to RFC 7296, section 3.3.6)
    if(childSa->encAlgoId != IKE_TRANSFORM_ID_INVALID &&
       childSa->authAlgoId != IKE_TRANSFORM_ID_INVALID &&
-      childSa->esn != IKE_TRANSFORM_ID_INVALID)
+      childSa->snId != IKE_TRANSFORM_ID_INVALID)
    {
       return NO_ERROR;
    }

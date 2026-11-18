@@ -384,7 +384,10 @@ error_t ahGenerateIcv(IpsecContext *context, IpsecSadEntry *sa,
          }
 
          //Finalize CMAC calculation
-         cmacFinal(cmacContext, ahHeader->icv, sa->icvLen);
+         error = cmacFinal(cmacContext, ahHeader->icv, sa->icvLen);
+
+         //Erase CMAC context
+         cmacDeinit(cmacContext);
       }
    }
    else
@@ -455,6 +458,9 @@ error_t ahGenerateIcv(IpsecContext *context, IpsecSadEntry *sa,
          hmacFinal(hmacContext, NULL);
          //The output of the HMAC can be truncated
          osMemcpy(ahHeader->icv, hmacContext->digest, sa->icvLen);
+
+         //Erase HMAC context
+         hmacDeinit(hmacContext);
       }
    }
    else
@@ -486,7 +492,6 @@ error_t ahVerifyIcv(IpsecContext *context, IpsecSadEntry *sa,
    const NetBuffer *buffer, size_t offset)
 {
    error_t error;
-   uint8_t mask;
    uint_t i;
    size_t n;
    uint8_t *p;
@@ -592,7 +597,10 @@ error_t ahVerifyIcv(IpsecContext *context, IpsecSadEntry *sa,
          }
 
          //Finalize CMAC computation
-         cmacFinal(cmacContext, checksum, sa->icvLen);
+         error = cmacFinal(cmacContext, checksum, sa->icvLen);
+
+         //Erase CMAC context
+         cmacDeinit(cmacContext);
       }
    }
    else
@@ -678,6 +686,9 @@ error_t ahVerifyIcv(IpsecContext *context, IpsecSadEntry *sa,
 
          //Finalize HMAC computation
          hmacFinal(hmacContext, checksum);
+
+         //Erase HMAC context
+         hmacDeinit(hmacContext);
       }
    }
    else
@@ -694,16 +705,14 @@ error_t ahVerifyIcv(IpsecContext *context, IpsecSadEntry *sa,
       //Debug message
       TRACE_DEBUG_ARRAY("Calculated ICV = ", checksum, sa->icvLen);
 
-      //The calculated checksum is bitwise compared to the received ICV
-      for(mask = 0, i = 0; i < sa->icvLen; i++)
+      //The calculated checksum is compared to the received ICV
+      if(cryptoCompMem(checksum, ahHeader->icv, sa->icvLen) != 0)
       {
-         mask |= checksum[i] ^ ahHeader->icv[i];
+         //If the ICV validation fails, the receiver must discard the received
+         //IP datagram as invalid. This is is an auditable event (refer to
+         //RFC 4302, section 3.4.3)
+         error = ERROR_INVALID_MAC;
       }
-
-      //If the ICV validation fails, the receiver must discard the received IP
-      //datagram as invalid. This is is an auditable event (refer to RFC 4302,
-      //section 3.4.3)
-      error = (mask == 0) ? NO_ERROR : ERROR_INVALID_MAC;
    }
 
    //Return status code
@@ -724,7 +733,7 @@ void ahProcessMutableIpv4Options(Ipv4Header *header)
    Ipv4Option *option;
 
    //Compute the length of the options field
-   length = (header->headerLength * 4) - sizeof(TcpHeader);
+   length = (header->headerLength * 4) - sizeof(Ipv4Header);
 
    //Point to the very first option
    i = 0;

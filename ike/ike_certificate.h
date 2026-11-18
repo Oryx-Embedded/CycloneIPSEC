@@ -60,6 +60,7 @@ error_t ikeValidateCertificate(IkeSaEntry *sa, IpsecPadEntry *padEntry,
    const X509CertInfo *certInfo, uint_t pathLen);
 
 error_t ikeCheckKeyUsage(const X509CertInfo *certInfo);
+error_t ikeCheckExtendedKeyUsage(const X509CertInfo *certInfo);
 
 //C++ guard
 #ifdef __cplusplus

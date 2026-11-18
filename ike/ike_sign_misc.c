@@ -800,27 +800,35 @@ const HashAlgo *ikeSelectSignHashAlgo(IkeSaEntry *sa,
 /**
  * @brief Retrieve the octets to be signed using EdDSA
  * @param[in] sa Pointer to the IKE SA
- * @param[in] id MAC authentication data
- * @param[in] idLen MAC authentication data
+ * @param[in] id Identification data
  * @param[out] macId Temporary buffer needed to calculate MACedID
  * @param[out] messageFrags Array of fragments representing the message to be
  *   signed
- * @param[in] initiator Specifies whether the digest is performed at initiator
- *   or responder side
+ * @param[in] initiator Specifies whether the operation is performed at
+ *   initiator or responder side
  * @return Error code
  **/
 
-error_t ikeGetSignedOctets(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
-   uint8_t *macId, DataFrag *messageFrags, bool_t initiator)
+error_t ikeGetSignedOctets(IkeSaEntry *sa, const IkeId *id, uint8_t *macId,
+   DataFrag *messageFrags, bool_t initiator)
 {
    error_t error;
+   DataFrag idFrags[3];
+
+   //Let ID' = IDType | RESERVED | InitIDData
+   idFrags[0].buffer = &id->type;
+   idFrags[0].length = sizeof(id->type);
+   idFrags[1].buffer = id->reserved;
+   idFrags[1].length = sizeof(id->reserved);
+   idFrags[2].buffer = id->data;
+   idFrags[2].length = id->length;
 
    //Check whether the calculation is performed at initiator side
    if(initiator)
    {
       //Compute prf(SK_pi, IDi')
-      error = ikePrf(sa->prfMacAlgo, sa->prfHashAlgo, sa->prfCipherAlgo,
-         sa->skpi, sa->prfKeyLen, id, idLen, macId);
+      error = ikePrfEx(sa->prfMacAlgo, sa->prfHashAlgo, sa->prfCipherAlgo,
+         sa->skpi, sa->prfKeyLen, idFrags, arraysize(idFrags), macId);
 
       //Check status code
       if(!error)
@@ -842,8 +850,8 @@ error_t ikeGetSignedOctets(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
    else
    {
       //Compute prf(SK_pr, IDr')
-      error = ikePrf(sa->prfMacAlgo, sa->prfHashAlgo, sa->prfCipherAlgo,
-         sa->skpr, sa->prfKeyLen, id, idLen, macId);
+      error = ikePrfEx(sa->prfMacAlgo, sa->prfHashAlgo, sa->prfCipherAlgo,
+         sa->skpr, sa->prfKeyLen, idFrags, arraysize(idFrags), macId);
 
       //Check status code
       if(!error)
@@ -873,27 +881,35 @@ error_t ikeGetSignedOctets(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
  * @brief Digest signed octets
  * @param[in] sa Pointer to the IKE SA
  * @param[in] hashAlgo Underlying hash function
- * @param[in] id MAC authentication data
- * @param[in] idLen MAC authentication data
+ * @param[in] id Identification data
  * @param[out] digest Calculated digest
- * @param[in] initiator Specifies whether the digest is performed at initiator
- *   or responder side
+ * @param[in] initiator Specifies whether the operation is performed at
+ *   initiator or responder side
  * @return Error code
  **/
 
 error_t ikeDigestSignedOctets(IkeSaEntry *sa, const HashAlgo *hashAlgo,
-   const uint8_t *id, size_t idLen, uint8_t *digest, bool_t initiator)
+   const IkeId *id, uint8_t *digest, bool_t initiator)
 {
    error_t error;
    HashContext hashContext;
    uint8_t macId[IKE_MAX_DIGEST_SIZE];
+   DataFrag idFrags[3];
+
+   //Let ID' = IDType | RESERVED | InitIDData
+   idFrags[0].buffer = &id->type;
+   idFrags[0].length = sizeof(id->type);
+   idFrags[1].buffer = id->reserved;
+   idFrags[1].length = sizeof(id->reserved);
+   idFrags[2].buffer = id->data;
+   idFrags[2].length = id->length;
 
    //Check whether the calculation is performed at initiator side
    if(initiator)
    {
       //Compute prf(SK_pi, IDi')
-      error = ikePrf(sa->prfMacAlgo, sa->prfHashAlgo, sa->prfCipherAlgo,
-         sa->skpi, sa->prfKeyLen, id, idLen, macId);
+      error = ikePrfEx(sa->prfMacAlgo, sa->prfHashAlgo, sa->prfCipherAlgo,
+         sa->skpi, sa->prfKeyLen, idFrags, arraysize(idFrags), macId);
 
       //Check status code
       if(!error)
@@ -914,8 +930,8 @@ error_t ikeDigestSignedOctets(IkeSaEntry *sa, const HashAlgo *hashAlgo,
    else
    {
       //Compute prf(SK_pr, IDr')
-      error = ikePrf(sa->prfMacAlgo, sa->prfHashAlgo, sa->prfCipherAlgo,
-         sa->skpr, sa->prfKeyLen, id, idLen, macId);
+      error = ikePrfEx(sa->prfMacAlgo, sa->prfHashAlgo, sa->prfCipherAlgo,
+         sa->skpr, sa->prfKeyLen, idFrags, arraysize(idFrags), macId);
 
       //Check status code
       if(!error)

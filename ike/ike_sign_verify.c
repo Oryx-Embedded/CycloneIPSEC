@@ -46,8 +46,6 @@
 /**
  * @brief Signature verification
  * @param[in] sa Pointer to the IKE SA
- * @param[in] id Pointer to the identification data
- * @param[in] idLen Length of the identification data, in bytes
  * @param[in] authMethod Authentication method
  * @param[in] publicKeyInfo Pointer to the subject's public key
  * @param[in] signature Signature to be verified
@@ -55,9 +53,9 @@
  * @return Error code
  **/
 
-error_t ikeVerifySignature(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
-   uint8_t authMethod, const X509SubjectPublicKeyInfo *publicKeyInfo,
-   const uint8_t *signature, size_t signatureLen)
+error_t ikeVerifySignature(IkeSaEntry *sa, uint8_t authMethod,
+   const X509SubjectPublicKeyInfo *publicKeyInfo, const uint8_t *signature,
+   size_t signatureLen)
 {
    error_t error;
 
@@ -68,7 +66,7 @@ error_t ikeVerifySignature(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
       //The new digital signature method is flexible enough to include all
       //current signature methods (RSA, RSA-PSS, DSA, ECDSA and EdDSA) and add
       //new methods in the future
-      error = ikeVerifyDigitalSignature(sa, id, idLen, publicKeyInfo,
+      error = ikeVerifyDigitalSignature(sa, publicKeyInfo,
          (const IkeAuthData *) signature, signatureLen);
    }
    else
@@ -78,8 +76,8 @@ error_t ikeVerifySignature(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
    if(authMethod == IKE_AUTH_METHOD_RSA)
    {
       //Verify RSA signature (RSASSA-PKCS1-v1_5 signature scheme)
-      error = ikeVerifyRsaSignature(sa, id, idLen, publicKeyInfo,
-         SHA1_HASH_ALGO, signature, signatureLen);
+      error = ikeVerifyRsaSignature(sa, publicKeyInfo, SHA1_HASH_ALGO,
+         signature, signatureLen);
    }
    else
 #endif
@@ -88,8 +86,8 @@ error_t ikeVerifySignature(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
    if(authMethod == IKE_AUTH_METHOD_DSS)
    {
       //Verify DSA signature
-      error = ikeVerifyDsaSignature(sa, id, idLen, publicKeyInfo,
-         SHA1_HASH_ALGO, signature, signatureLen, IKE_SIGN_FORMAT_RAW);
+      error = ikeVerifyDsaSignature(sa, publicKeyInfo, SHA1_HASH_ALGO,
+         signature, signatureLen, IKE_SIGN_FORMAT_RAW);
    }
    else
 #endif
@@ -99,9 +97,8 @@ error_t ikeVerifySignature(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
    if(authMethod == IKE_AUTH_METHOD_ECDSA_P256_SHA256)
    {
       //Verify ECDSA signature
-      error = ikeVerifyEcdsaSignature(sa, id, idLen, publicKeyInfo,
-         SECP256R1_CURVE, SHA256_HASH_ALGO, signature, signatureLen,
-         IKE_SIGN_FORMAT_RAW);
+      error = ikeVerifyEcdsaSignature(sa, publicKeyInfo, SECP256R1_CURVE,
+         SHA256_HASH_ALGO, signature, signatureLen, IKE_SIGN_FORMAT_RAW);
    }
    else
 #endif
@@ -111,9 +108,8 @@ error_t ikeVerifySignature(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
    if(authMethod == IKE_AUTH_METHOD_ECDSA_P384_SHA384)
    {
       //Verify ECDSA signature
-      error = ikeVerifyEcdsaSignature(sa, id, idLen, publicKeyInfo,
-         SECP384R1_CURVE, SHA384_HASH_ALGO, signature, signatureLen,
-         IKE_SIGN_FORMAT_RAW);
+      error = ikeVerifyEcdsaSignature(sa, publicKeyInfo, SECP384R1_CURVE,
+         SHA384_HASH_ALGO, signature, signatureLen, IKE_SIGN_FORMAT_RAW);
    }
    else
 #endif
@@ -123,9 +119,8 @@ error_t ikeVerifySignature(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
    if(authMethod == IKE_AUTH_METHOD_ECDSA_P521_SHA512)
    {
       //Verify ECDSA signature
-      error = ikeVerifyEcdsaSignature(sa, id, idLen, publicKeyInfo,
-         SECP521R1_CURVE, SHA512_HASH_ALGO, signature, signatureLen,
-         IKE_SIGN_FORMAT_RAW);
+      error = ikeVerifyEcdsaSignature(sa, publicKeyInfo, SECP521R1_CURVE,
+         SHA512_HASH_ALGO, signature, signatureLen, IKE_SIGN_FORMAT_RAW);
    }
    else
 #endif
@@ -143,17 +138,15 @@ error_t ikeVerifySignature(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
 /**
  * @brief Digital signature verification
  * @param[in] sa Pointer to the IKE SA
- * @param[in] id Pointer to the identification data
- * @param[in] idLen Length of the identification data, in bytes
  * @param[in] publicKeyInfo Pointer to the subject's public key
  * @param[in] authData Pointer to the authentication data
  * @param[in] authDataLen Length of the authentication data, in bytes
  * @return Error code
  **/
 
-error_t ikeVerifyDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const X509SubjectPublicKeyInfo *publicKeyInfo,
-   const IkeAuthData *authData, size_t authDataLen)
+error_t ikeVerifyDigitalSignature(IkeSaEntry *sa,
+   const X509SubjectPublicKeyInfo *publicKeyInfo, const IkeAuthData *authData,
+   size_t authDataLen)
 {
    error_t error;
    size_t n;
@@ -197,8 +190,8 @@ error_t ikeVerifyDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
             if(signAlgo == IKE_SIGN_ALGO_RSA)
             {
                //Verify RSA signature (RSASSA-PKCS1-v1_5 signature scheme)
-               error = ikeVerifyRsaSignature(sa, id, idLen, publicKeyInfo,
-                  hashAlgo, signature, signatureLen);
+               error = ikeVerifyRsaSignature(sa, publicKeyInfo, hashAlgo,
+                  signature, signatureLen);
             }
             else
 #endif
@@ -207,9 +200,8 @@ error_t ikeVerifyDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
             if(signAlgo == IKE_SIGN_ALGO_RSA_PSS)
             {
                //Verify RSA signature (RSASSA-PSS signature scheme)
-               error = ikeVerifyRsaPssSignature(sa, id, idLen, publicKeyInfo,
-                  hashAlgo, signAlgoId.rsaPssParams.saltLen, signature,
-                  signatureLen);
+               error = ikeVerifyRsaPssSignature(sa, publicKeyInfo, hashAlgo,
+                  signAlgoId.rsaPssParams.saltLen, signature, signatureLen);
             }
             else
 #endif
@@ -218,8 +210,8 @@ error_t ikeVerifyDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
             if(signAlgo == IKE_SIGN_ALGO_DSA)
             {
                //Verify DSA signature
-               error = ikeVerifyDsaSignature(sa, id, idLen, publicKeyInfo,
-                  hashAlgo, signature, signatureLen, IKE_SIGN_FORMAT_ASN1);
+               error = ikeVerifyDsaSignature(sa, publicKeyInfo, hashAlgo,
+                  signature, signatureLen, IKE_SIGN_FORMAT_ASN1);
             }
             else
 #endif
@@ -228,8 +220,8 @@ error_t ikeVerifyDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
             if(signAlgo == IKE_SIGN_ALGO_ECDSA)
             {
                //Verify ECDSA signature
-               error = ikeVerifyEcdsaSignature(sa, id, idLen, publicKeyInfo,
-                  NULL, hashAlgo, signature, signatureLen, IKE_SIGN_FORMAT_ASN1);
+               error = ikeVerifyEcdsaSignature(sa, publicKeyInfo, NULL,
+                  hashAlgo, signature, signatureLen, IKE_SIGN_FORMAT_ASN1);
             }
             else
 #endif
@@ -238,8 +230,8 @@ error_t ikeVerifyDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
             if(signAlgo == IKE_SIGN_ALGO_ED25519)
             {
                //Verify Ed25519 signature (PureEdDSA mode)
-               error = ikeVerifyEd25519Signature(sa, id, idLen, publicKeyInfo,
-                  signature, signatureLen);
+               error = ikeVerifyEd25519Signature(sa, publicKeyInfo, signature,
+                  signatureLen);
             }
             else
 #endif
@@ -248,8 +240,8 @@ error_t ikeVerifyDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
             if(signAlgo == IKE_SIGN_ALGO_ED448)
             {
                //Verify Ed448 signature (PureEdDSA mode)
-               error = ikeVerifyEd448Signature(sa, id, idLen, publicKeyInfo,
-                  signature, signatureLen);
+               error = ikeVerifyEd448Signature(sa, publicKeyInfo, signature,
+                  signatureLen);
             }
             else
 #endif
@@ -280,8 +272,6 @@ error_t ikeVerifyDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
 /**
  * @brief RSA signature verification
  * @param[in] sa Pointer to the IKE SA
- * @param[in] id Pointer to the identification data
- * @param[in] idLen Length of the identification data, in bytes
  * @param[in] publicKeyInfo Pointer to the subject's public key
  * @param[in] hashAlgo Hash algorithm
  * @param[in] signature Signature to be verified
@@ -289,9 +279,9 @@ error_t ikeVerifyDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
  * @return Error code
  **/
 
-error_t ikeVerifyRsaSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const X509SubjectPublicKeyInfo *publicKeyInfo,
-   const HashAlgo *hashAlgo, const uint8_t *signature, size_t signatureLen)
+error_t ikeVerifyRsaSignature(IkeSaEntry *sa,
+   const X509SubjectPublicKeyInfo *publicKeyInfo, const HashAlgo *hashAlgo,
+   const uint8_t *signature, size_t signatureLen)
 {
 #if (IKE_RSA_SIGN_SUPPORT == ENABLED)
    error_t error;
@@ -307,7 +297,7 @@ error_t ikeVerifyRsaSignature(IkeSaEntry *sa, const uint8_t *id,
       rsaInitPublicKey(&rsaPublicKey);
 
       //Digest signed octets
-      error = ikeDigestSignedOctets(sa, hashAlgo, id, idLen, digest,
+      error = ikeDigestSignedOctets(sa, hashAlgo, &sa->peerId, digest,
          !sa->originalInitiator);
 
       //Check status code
@@ -320,11 +310,36 @@ error_t ikeVerifyRsaSignature(IkeSaEntry *sa, const uint8_t *id,
       //Check status code
       if(!error)
       {
+         //The RSA modulus must be an odd integer
+         if(mpiIsEven(&rsaPublicKey.n))
+         {
+            //Report an error
+            error = ERROR_BAD_CERTIFICATE;
+         }
+
          //Get the length of the modulus, in bits
          k = mpiGetBitLength(&rsaPublicKey.n);
 
          //Applications should also enforce minimum and maximum key sizes
          if(k < IKE_MIN_RSA_MODULUS_SIZE || k > IKE_MAX_RSA_MODULUS_SIZE)
+         {
+            //Report an error
+            error = ERROR_BAD_CERTIFICATE;
+         }
+
+         //The public exponent must be an odd integer greater than 1
+         if(mpiCompInt(&rsaPublicKey.e, 1) <= 0 || mpiIsEven(&rsaPublicKey.e))
+         {
+            //Report an error
+            error = ERROR_BAD_CERTIFICATE;
+         }
+
+         //Get the length of the public exponent, in bits
+         k = mpiGetBitLength(&rsaPublicKey.e);
+
+         //Limit the size of the public exponent to bound the cost of the RSA
+         //public operation
+         if(k > IKE_MAX_RSA_PUBLIC_EXPONENT_SIZE)
          {
             //Report an error
             error = ERROR_BAD_CERTIFICATE;
@@ -360,8 +375,6 @@ error_t ikeVerifyRsaSignature(IkeSaEntry *sa, const uint8_t *id,
 /**
  * @brief RSA-PSS signature verification
  * @param[in] sa Pointer to the IKE SA
- * @param[in] id Pointer to the identification data
- * @param[in] idLen Length of the identification data, in bytes
  * @param[in] publicKeyInfo Pointer to the subject's public key
  * @param[in] hashAlgo Hash algorithm
  * @param[in] saltLen Length of the salt, in bytes
@@ -370,10 +383,9 @@ error_t ikeVerifyRsaSignature(IkeSaEntry *sa, const uint8_t *id,
  * @return Error code
  **/
 
-error_t ikeVerifyRsaPssSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const X509SubjectPublicKeyInfo *publicKeyInfo,
-   const HashAlgo *hashAlgo, size_t saltLen, const uint8_t *signature,
-   size_t signatureLen)
+error_t ikeVerifyRsaPssSignature(IkeSaEntry *sa,
+   const X509SubjectPublicKeyInfo *publicKeyInfo, const HashAlgo *hashAlgo,
+   size_t saltLen, const uint8_t *signature, size_t signatureLen)
 {
 #if (IKE_RSA_PSS_SIGN_SUPPORT == ENABLED)
    error_t error;
@@ -395,7 +407,7 @@ error_t ikeVerifyRsaPssSignature(IkeSaEntry *sa, const uint8_t *id,
       rsaInitPublicKey(&rsaPublicKey);
 
       //Digest signed octets
-      error = ikeDigestSignedOctets(sa, hashAlgo, id, idLen, digest,
+      error = ikeDigestSignedOctets(sa, hashAlgo, &sa->peerId, digest,
          !sa->originalInitiator);
 
       //Check status code
@@ -408,11 +420,36 @@ error_t ikeVerifyRsaPssSignature(IkeSaEntry *sa, const uint8_t *id,
       //Check status code
       if(!error)
       {
+         //The RSA modulus must be an odd integer
+         if(mpiIsEven(&rsaPublicKey.n))
+         {
+            //Report an error
+            error = ERROR_BAD_CERTIFICATE;
+         }
+
          //Get the length of the modulus, in bits
          k = mpiGetBitLength(&rsaPublicKey.n);
 
          //Applications should also enforce minimum and maximum key sizes
          if(k < IKE_MIN_RSA_MODULUS_SIZE || k > IKE_MAX_RSA_MODULUS_SIZE)
+         {
+            //Report an error
+            error = ERROR_BAD_CERTIFICATE;
+         }
+
+         //The public exponent must be an odd integer greater than 1
+         if(mpiCompInt(&rsaPublicKey.e, 1) <= 0 || mpiIsEven(&rsaPublicKey.e))
+         {
+            //Report an error
+            error = ERROR_BAD_CERTIFICATE;
+         }
+
+         //Get the length of the public exponent, in bits
+         k = mpiGetBitLength(&rsaPublicKey.e);
+
+         //Limit the size of the public exponent to bound the cost of the RSA
+         //public operation
+         if(k > IKE_MAX_RSA_PUBLIC_EXPONENT_SIZE)
          {
             //Report an error
             error = ERROR_BAD_CERTIFICATE;
@@ -448,8 +485,6 @@ error_t ikeVerifyRsaPssSignature(IkeSaEntry *sa, const uint8_t *id,
 /**
  * @brief DSA signature verification
  * @param[in] sa Pointer to the IKE SA
- * @param[in] id Pointer to the identification data
- * @param[in] idLen Length of the identification data, in bytes
  * @param[in] publicKeyInfo Pointer to the subject's public key
  * @param[in] hashAlgo Hash algorithm
  * @param[in] signature Signature to be verified
@@ -458,10 +493,9 @@ error_t ikeVerifyRsaPssSignature(IkeSaEntry *sa, const uint8_t *id,
  * @return Error code
  **/
 
-error_t ikeVerifyDsaSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const X509SubjectPublicKeyInfo *publicKeyInfo,
-   const HashAlgo *hashAlgo, const uint8_t *signature, size_t signatureLen,
-   IkeSignFormat format)
+error_t ikeVerifyDsaSignature(IkeSaEntry *sa,
+   const X509SubjectPublicKeyInfo *publicKeyInfo, const HashAlgo *hashAlgo,
+   const uint8_t *signature, size_t signatureLen, IkeSignFormat format)
 {
 #if (IKE_DSA_SIGN_SUPPORT == ENABLED)
    error_t error;
@@ -480,7 +514,7 @@ error_t ikeVerifyDsaSignature(IkeSaEntry *sa, const uint8_t *id,
       dsaInitSignature(&dsaSignature);
 
       //Digest signed octets
-      error = ikeDigestSignedOctets(sa, hashAlgo, id, idLen, digest,
+      error = ikeDigestSignedOctets(sa, hashAlgo, &sa->peerId, digest,
          !sa->originalInitiator);
 
       //Check status code
@@ -542,8 +576,6 @@ error_t ikeVerifyDsaSignature(IkeSaEntry *sa, const uint8_t *id,
 /**
  * @brief ECDSA signature verification
  * @param[in] sa Pointer to the IKE SA
- * @param[in] id Pointer to the identification data
- * @param[in] idLen Length of the identification data, in bytes
  * @param[in] publicKeyInfo Pointer to the subject's public key
  * @param[in] group Elliptic curve group
  * @param[in] hashAlgo Hash algorithm
@@ -553,10 +585,10 @@ error_t ikeVerifyDsaSignature(IkeSaEntry *sa, const uint8_t *id,
  * @return Error code
  **/
 
-error_t ikeVerifyEcdsaSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const X509SubjectPublicKeyInfo *publicKeyInfo,
-   const EcCurve *group, const HashAlgo *hashAlgo, const uint8_t *signature,
-   size_t signatureLen, IkeSignFormat format)
+error_t ikeVerifyEcdsaSignature(IkeSaEntry *sa,
+   const X509SubjectPublicKeyInfo *publicKeyInfo, const EcCurve *group,
+   const HashAlgo *hashAlgo, const uint8_t *signature, size_t signatureLen,
+   IkeSignFormat format)
 {
 #if (IKE_ECDSA_SIGN_SUPPORT == ENABLED)
    error_t error;
@@ -582,7 +614,7 @@ error_t ikeVerifyEcdsaSignature(IkeSaEntry *sa, const uint8_t *id,
          ecdsaInitSignature(&ecdsaSignature);
 
          //Digest signed octets
-         error = ikeDigestSignedOctets(sa, hashAlgo, id, idLen, digest,
+         error = ikeDigestSignedOctets(sa, hashAlgo, &sa->peerId, digest,
             !sa->originalInitiator);
 
          //Check status code
@@ -636,17 +668,15 @@ error_t ikeVerifyEcdsaSignature(IkeSaEntry *sa, const uint8_t *id,
 /**
  * @brief Ed25519 signature verification
  * @param[in] sa Pointer to the IKE SA
- * @param[in] id Pointer to the identification data
- * @param[in] idLen Length of the identification data, in bytes
  * @param[in] publicKeyInfo Pointer to the subject's public key
  * @param[in] signature Signature to be verified
  * @param[in] signatureLen Length of the signature, in bytes
  * @return Error code
  **/
 
-error_t ikeVerifyEd25519Signature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const X509SubjectPublicKeyInfo *publicKeyInfo,
-   const uint8_t *signature, size_t signatureLen)
+error_t ikeVerifyEd25519Signature(IkeSaEntry *sa,
+   const X509SubjectPublicKeyInfo *publicKeyInfo, const uint8_t *signature,
+   size_t signatureLen)
 {
 #if (IKE_ED25519_SIGN_SUPPORT == ENABLED)
    error_t error;
@@ -666,7 +696,7 @@ error_t ikeVerifyEd25519Signature(IkeSaEntry *sa, const uint8_t *id,
          {
             //Data to be signed is run through the EdDSA algorithm without
             //pre-hashing
-            error = ikeGetSignedOctets(sa, id, idLen, macId, messageFrags,
+            error = ikeGetSignedOctets(sa, &sa->peerId, macId, messageFrags,
                !sa->originalInitiator);
 
             //Check status code
@@ -707,17 +737,15 @@ error_t ikeVerifyEd25519Signature(IkeSaEntry *sa, const uint8_t *id,
 /**
  * @brief Ed448 signature verification
  * @param[in] sa Pointer to the IKE SA
- * @param[in] id Pointer to the identification data
- * @param[in] idLen Length of the identification data, in bytes
  * @param[in] publicKeyInfo Pointer to the subject's public key
  * @param[in] signature Signature to be verified
  * @param[in] signatureLen Length of the signature, in bytes
  * @return Error code
  **/
 
-error_t ikeVerifyEd448Signature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const X509SubjectPublicKeyInfo *publicKeyInfo,
-   const uint8_t *signature, size_t signatureLen)
+error_t ikeVerifyEd448Signature(IkeSaEntry *sa,
+   const X509SubjectPublicKeyInfo *publicKeyInfo, const uint8_t *signature,
+   size_t signatureLen)
 {
 #if (IKE_ED448_SIGN_SUPPORT == ENABLED)
    error_t error;
@@ -737,7 +765,7 @@ error_t ikeVerifyEd448Signature(IkeSaEntry *sa, const uint8_t *id,
          {
             //Data to be signed is run through the EdDSA algorithm without
             //pre-hashing
-            error = ikeGetSignedOctets(sa, id, idLen, macId, messageFrags,
+            error = ikeGetSignedOctets(sa, &sa->peerId, macId, messageFrags,
                !sa->originalInitiator);
 
             //Check status code

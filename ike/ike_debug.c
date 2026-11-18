@@ -34,6 +34,7 @@
 //Dependencies
 #include "ike/ike.h"
 #include "ike/ike_debug.h"
+#include "ike/ike_eap_debug.h"
 #include "debug.h"
 
 //Check IKEv2 library configuration
@@ -74,7 +75,7 @@ static const IkeParamName ikePayloadList[] =
    {IKE_PAYLOAD_TYPE_TSR,     "Traffic Selector - Responder"},
    {IKE_PAYLOAD_TYPE_SK,      "Encrypted and Authenticated"},
    {IKE_PAYLOAD_TYPE_CP,      "Configuration"},
-   {IKE_PAYLOAD_TYPE_EAP,     "Extensible Authentication"},
+   {IKE_PAYLOAD_TYPE_EAP,     "Extensible Authentication Protocol"},
    {IKE_PAYLOAD_TYPE_GSPM,    "Generic Secure Password Method"},
    {IKE_PAYLOAD_TYPE_IDG,     "Group Identification"},
    {IKE_PAYLOAD_TYPE_GSA,     "Group Security Association"},
@@ -109,7 +110,7 @@ static const IkeParamName ikeTransformTypeList[] =
    {IKE_TRANSFORM_TYPE_PRF,    "Pseudorandom Function"},
    {IKE_TRANSFORM_TYPE_INTEG,  "Integrity Algorithm"},
    {IKE_TRANSFORM_TYPE_KE,     "Key Exchange Method"},
-   {IKE_TRANSFORM_TYPE_ESN,    "Extended Sequence Numbers"},
+   {IKE_TRANSFORM_TYPE_SN,     "Sequence Numbers"},
    {IKE_TRANSFORM_TYPE_ADDKE1, "Additional Key Exchange 1"},
    {IKE_TRANSFORM_TYPE_ADDKE2, "Additional Key Exchange 2"},
    {IKE_TRANSFORM_TYPE_ADDKE3, "Additional Key Exchange 3"},
@@ -225,11 +226,12 @@ static const IkeParamName ikeKeAlgoList[] =
    {IKE_TRANSFORM_ID_KE_ML_KEM_1024,       "ML-KEM-1024"},
 };
 
-//Extended sequence numbers
-static const IkeParamName ikeEsnList[] =
+//SN transforms
+static const IkeParamName ikeSnTranformList[] =
 {
-   {IKE_TRANSFORM_ID_ESN_NO,  "No ESNs"},
-   {IKE_TRANSFORM_ID_ESN_YES, "ESNs"}
+   {IKE_TRANSFORM_ID_SN_32BIT,        "32-bit Sequential Numbers"},
+   {IKE_TRANSFORM_ID_SN_64BIT,        "Partially Transmitted 64-bit Sequential Numbers"},
+   {IKE_TRANSFORM_ID_SN_32BIT_UNSPEC, "32-bit Unspecified Numbers"}
 };
 
 //Transform attribute formats
@@ -394,7 +396,8 @@ static const IkeParamName ikeNotifyMsgTypeList[] =
    {IKE_NOTIFY_MSG_TYPE_SUPPORTED_AUTH_METHODS,              "SUPPORTED_AUTH_METHODS"},
    {IKE_NOTIFY_MSG_TYPE_SA_RESOURCE_INFO,                    "SA_RESOURCE_INFO"},
    {IKE_NOTIFY_MSG_TYPE_USE_PPK_INT,                         "USE_PPK_INT"},
-   {IKE_NOTIFY_MSG_TYPE_PPK_IDENTITY_KEY,                    "PPK_IDENTITY_KEY"}
+   {IKE_NOTIFY_MSG_TYPE_PPK_IDENTITY_KEY,                    "PPK_IDENTITY_KEY"},
+   {IKE_NOTIFY_MSG_TYPE_IKE_SA_INIT_FULL_TRANSCRIPT_AUTH,    "IKE_SA_INIT_FULL_TRANSCRIPT_AUTH"}
 };
 
 //Traffic selector types
@@ -404,6 +407,46 @@ static const IkeParamName ikeTsTypeList[] =
    {IKE_TS_TYPE_IPV6_ADDR_RANGE, "TS_IPV6_ADDR_RANGE"},
    {IKE_TS_TYPE_FC_ADDR_RANGE,   "TS_FC_ADDR_RANGE"},
    {IKE_TS_TYPE_SECLABEL,        "TS_SECLABEL"}
+};
+
+//Configuration types
+static const IkeParamName ikeConfigTypeList[] =
+{
+   {IKE_CONFIG_TYPE_REQUEST, "CFG_REQUEST"},
+   {IKE_CONFIG_TYPE_REPLY,   "CFG_REPLY"},
+   {IKE_CONFIG_TYPE_SET,     "CFG_SET"},
+   {IKE_CONFIG_TYPE_ACK,     "CFG_ACK"}
+};
+
+//Configuration attribute types
+static const IkeParamName ikeConfigAttrTypeList[] =
+{
+   {IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_ADDRESS,              "INTERNAL_IP4_ADDRESS"},
+   {IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_NETMASK,              "INTERNAL_IP4_NETMASK"},
+   {IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_DNS,                  "INTERNAL_IP4_DNS"},
+   {IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_NBNS,                 "INTERNAL_IP4_NBNS"},
+   {IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_DHCP,                 "INTERNAL_IP4_DHCP"},
+   {IKE_CONFIG_ATTR_TYPE_APPLICATION_VERSION,               "APPLICATION_VERSION"},
+   {IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_ADDRESS,              "INTERNAL_IP6_ADDRESS"},
+   {IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_DNS,                  "INTERNAL_IP6_DNS"},
+   {IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_DHCP,                 "INTERNAL_IP6_DHCP"},
+   {IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_SUBNET,               "INTERNAL_IP4_SUBNET"},
+   {IKE_CONFIG_ATTR_TYPE_SUPPORTED_ATTRIBUTES,              "SUPPORTED_ATTRIBUTES"},
+   {IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_SUBNET,               "INTERNAL_IP6_SUBNET"},
+   {IKE_CONFIG_ATTR_TYPE_MIP6_HOME_PREFIX,                  "MIP6_HOME_PREFIX"},
+   {IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_LINK,                 "INTERNAL_IP6_LINK"},
+   {IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_PREFIX,               "INTERNAL_IP6_PREFIX"},
+   {IKE_CONFIG_ATTR_TYPE_HOME_AGENT_ADDRESS,                "HOME_AGENT_ADDRESS"},
+   {IKE_CONFIG_ATTR_TYPE_P_CSCF_IP4_ADDRESS,                "P_CSCF_IP4_ADDRESS"},
+   {IKE_CONFIG_ATTR_TYPE_P_CSCF_IP6_ADDRESS,                "P_CSCF_IP6_ADDRESS"},
+   {IKE_CONFIG_ATTR_TYPE_FTT_KAT,                           "FTT_KAT"},
+   {IKE_CONFIG_ATTR_TYPE_EXTERNAL_SOURCE_IP4_NAT_INFO,      "EXTERNAL_SOURCE_IP4_NAT_INFO"},
+   {IKE_CONFIG_ATTR_TYPE_TIMEOUT_PERIOD_FOR_LIVENESS_CHECK, "TIMEOUT_PERIOD_FOR_LIVENESS_CHECK"},
+   {IKE_CONFIG_ATTR_TYPE_INTERNAL_DNS_DOMAIN,               "INTERNAL_DNS_DOMAIN"},
+   {IKE_CONFIG_ATTR_TYPE_INTERNAL_DNSSEC_TA,                "INTERNAL_DNSSEC_TA"},
+   {IKE_CONFIG_ATTR_TYPE_ENCDNS_IP4,                        "ENCDNS_IP4"},
+   {IKE_CONFIG_ATTR_TYPE_ENCDNS_IP6,                        "ENCDNS_IP6"},
+   {IKE_CONFIG_ATTR_TYPE_ENCDNS_DIGEST_INFO,                "ENCDNS_DIGEST_INFO"}
 };
 
 //IP protocol IDs
@@ -649,13 +692,23 @@ void ikeDumpPayloads(const uint8_t *payloads, size_t length,
          //payload in the message (refer to RFC 7296, section 3.14)
          break;
       }
+      else if(nextPayload == IKE_PAYLOAD_TYPE_CP)
+      {
+         //Dump Configuration payload
+         ikeDumpConfigPayload((IkeConfigPayload *) payload, n);
+      }
+      else if(nextPayload == IKE_PAYLOAD_TYPE_EAP)
+      {
+         //Dump EAP payload
+         ikeDumpEapPayload((IkeEapPayload *) payload, n);
+      }
       else if(nextPayload == IKE_PAYLOAD_TYPE_SKF)
       {
          //Dump Encrypted Fragment payload
          ikeDumpEncryptedFragPayload((IkeEncryptedFragPayload *) payload, n);
 
          //As is the case for the Encrypted payload, the Encrypted Fragment
-         //payload, if present in a message, MUST be the last payload in the
+         //payload, if present in a message, must be the last payload in the
          //message (refer to RFC 7383, section 2.5)
          break;
       }
@@ -901,11 +954,11 @@ void ikeDumpTransform(const IkeTransform *transform, size_t length)
       algoName = ikeGetParamName(transformId, ikeKeAlgoList,
          arraysize(ikeKeAlgoList));
    }
-   else if(transform->transformType == IKE_TRANSFORM_TYPE_ESN)
+   else if(transform->transformType == IKE_TRANSFORM_TYPE_SN)
    {
-      //Transform type 5 (extended sequence numbers)
-      algoName = ikeGetParamName(transformId, ikeEsnList,
-         arraysize(ikeEsnList));
+      //Transform type 5 (sequence numbers)
+      algoName = ikeGetParamName(transformId, ikeSnTranformList,
+         arraysize(ikeSnTranformList));
    }
    else if(transform->transformType == IKE_TRANSFORM_TYPE_ADDKE1 ||
       transform->transformType == IKE_TRANSFORM_TYPE_ADDKE2 ||
@@ -1098,15 +1151,26 @@ void ikeDumpIdPayload(const IkeIdPayload *payload, size_t length)
    TRACE_DEBUG("    ID Type = %" PRIu8 " (%s)\r\n", payload->idType,
       idTypeName);
 
+   //Dump Reserved field
+   TRACE_DEBUG("    Reserved (%" PRIuSIZE " bytes)\r\n", 3);
+   TRACE_DEBUG_ARRAY("      ", payload->reserved, 3);
+
    //The Identification Data field has a variable length
    length -= sizeof(IkeIdPayload);
 
    //Dump Identification Data field
    TRACE_DEBUG("    Identification Data (%" PRIuSIZE " bytes)\r\n", length);
 
+   //Fully-qualified domain name or email address string?
+   if(payload->idType == IKE_ID_TYPE_FQDN ||
+      payload->idType == IKE_ID_TYPE_RFC822_ADDR)
+   {
+      //Dump fully-qualified domain name or email address string
+      ikeDumpString("      ", payload->idData, length);
+   }
 #if (IPV4_SUPPORT == ENABLED)
    //IPv4 address?
-   if(payload->idType == IKE_ID_TYPE_IPV4_ADDR && length == sizeof(Ipv4Addr))
+   else if(payload->idType == IKE_ID_TYPE_IPV4_ADDR && length == sizeof(Ipv4Addr))
    {
       Ipv4Addr ipv4Addr;
 
@@ -1115,11 +1179,10 @@ void ikeDumpIdPayload(const IkeIdPayload *payload, size_t length)
       //Dump IPv4 address
       TRACE_DEBUG("      %s\r\n", ipv4AddrToString(ipv4Addr, NULL));
    }
-   else
 #endif
 #if (IPV6_SUPPORT == ENABLED)
    //IPv4 address?
-   if(payload->idType == IKE_ID_TYPE_IPV6_ADDR && length == sizeof(Ipv6Addr))
+   else if(payload->idType == IKE_ID_TYPE_IPV6_ADDR && length == sizeof(Ipv6Addr))
    {
       Ipv6Addr ipv6Addr;
 
@@ -1128,8 +1191,8 @@ void ikeDumpIdPayload(const IkeIdPayload *payload, size_t length)
       //Dump IPv6 address
       TRACE_DEBUG("      %s\r\n", ipv6AddrToString(&ipv6Addr, NULL));
    }
-   else
 #endif
+   else
    {
       //Dump Identification Data field
       TRACE_DEBUG_ARRAY("      ", payload->idData, length);
@@ -1223,6 +1286,10 @@ void ikeDumpAuthPayload(const IkeAuthPayload *payload, size_t length)
    //Dump Auth Method field
    TRACE_DEBUG("    Auth Method = %" PRIu8 " (%s)\r\n",
       payload->authMethod, authMethodName);
+
+   //Dump Reserved field
+   TRACE_DEBUG("    Reserved (%" PRIuSIZE " bytes)\r\n", 3);
+   TRACE_DEBUG_ARRAY("      ", payload->reserved, 3);
 
    //The Authentication Data field has a variable length
    n = length - sizeof(IkeAuthPayload);
@@ -1460,6 +1527,10 @@ void ikeDumpTsPayload(const IkeTsPayload *payload, size_t length)
    //Dump Number of TSs field
    TRACE_DEBUG("    Number of TSs = %" PRIu8 "\r\n", payload->numTs);
 
+   //Dump Reserved field
+   TRACE_DEBUG("    Reserved (%" PRIuSIZE " bytes)\r\n", 3);
+   TRACE_DEBUG_ARRAY("      ", payload->reserved, 3);
+
    //Point to the first byte of the Traffic Selectors field
    p = (uint8_t *) payload + sizeof(IkeProposal);
    //Determine the length of the Traffic Selectors field
@@ -1606,7 +1677,251 @@ void ikeDumpEncryptedPayload(const IkeEncryptedPayload *payload, size_t length)
    //Dump encrypted data
    TRACE_DEBUG("    Encrypted Data (%" PRIuSIZE " bytes)\r\n", n);
    TRACE_DEBUG_ARRAY("      ", payload->iv, n);
+}
 
+
+/**
+ * @brief Dump Configuration payload
+ * @param[in] payload Pointer to the payload to dump
+ * @param[in] length Length of the payload, in bytes
+ **/
+
+void ikeDumpConfigPayload(const IkeConfigPayload *payload, size_t length)
+{
+   size_t n;
+   const uint8_t *p;
+   const IkeConfigAttr *attr;
+   const char_t *configTypeName;
+
+   //Check the length of the payload
+   if(length < sizeof(IkeConfigPayload))
+      return;
+
+   //The CFG Type field specifies the type of exchange represented by the
+   //configuration attributes
+   configTypeName = ikeGetParamName(payload->configType, ikeConfigTypeList,
+      arraysize(ikeConfigTypeList));
+
+   //Dump CFG Type field
+   TRACE_DEBUG("    CFG Type = %" PRIu8 " (%s)\r\n", payload->configType,
+      configTypeName);
+
+   //Dump Reserved field
+   TRACE_DEBUG("    Reserved (%" PRIuSIZE " bytes)\r\n", 3);
+   TRACE_DEBUG_ARRAY("      ", payload->reserved, 3);
+
+   //Point to the first byte of the Configuration Attributes field
+   p = payload->configAttributes;
+   //Determine the length of the Configuration Attributes field
+   length -= sizeof(IkeConfigPayload);
+
+   //There may be zero or more configuration attributes in the payload
+   while(length >= sizeof(IkeConfigAttr))
+   {
+      //Point to the configuration attribute
+      attr = (IkeConfigAttr *) p;
+
+      //Determine the length in octets of the configuration attribute
+      n = sizeof(IkeConfigAttr) + ntohs(attr->length);
+
+      //Check the length of the configuration attribute
+      if(n > length)
+         break;
+
+      //Dump configuration attribute
+      ikeDumpConfigAttr(attr, n);
+
+      //Jump to the next configuration attribute
+      p += n;
+      length -= n;
+   }
+}
+
+
+/**
+ * @brief Dump configuration attribute
+ * @param[in] payload Pointer to the configuration attribute to dump
+ * @param[in] length Length of the configuration attribute, in bytes
+ **/
+
+void ikeDumpConfigAttr(const IkeConfigAttr *attr, size_t length)
+{
+   size_t i;
+   size_t n;
+   uint16_t type;
+   const char_t *configAttrTypeName;
+
+   //Malformed configuration attribute?
+   if(length < sizeof(IkeConfigAttr))
+      return;
+
+   //The Length field indicates the length in octets of the value
+   n = ntohs(attr->length);
+
+   //Malformed configuration attribute?
+   if(length < (sizeof(IkeConfigAttr) + n))
+      return;
+
+   //The Attribute Type is unique identifier
+   type = ntohs(attr->type) & IKE_CONFIG_ATTR_TYPE_MASK;
+
+   //Convert the Attribute Type to string representation
+   configAttrTypeName = ikeGetParamName(type, ikeConfigAttrTypeList,
+      arraysize(ikeConfigAttrTypeList));
+
+   //Dump configuration attribute
+   TRACE_DEBUG("    Configuration Attribute (%" PRIuSIZE " bytes)\r\n", length);
+   TRACE_DEBUG("      Type = %" PRIu16 " (%s)\r\n", type, configAttrTypeName);
+   TRACE_DEBUG("      Length = %" PRIu16 "\r\n", n);
+   TRACE_DEBUG("      Value (%" PRIuSIZE " bytes)\r\n", n);
+
+   //Printable string?
+   if(type == IKE_CONFIG_ATTR_TYPE_APPLICATION_VERSION)
+   {
+      //Dump attribute value
+      if(n > 0)
+      {
+         ikeDumpString("        ", attr->value, n);
+      }
+   }
+#if (IPV4_SUPPORT == ENABLED)
+   //IPv4 address?
+   else if(type == IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_ADDRESS ||
+      type == IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_NETMASK ||
+      type == IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_DNS ||
+      type == IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_NBNS ||
+      type == IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_DHCP)
+   {
+      //These attributes can be 0 or 4 octets
+      if(n == sizeof(Ipv4Addr))
+      {
+         Ipv4Addr ipAddr;
+
+         //Copy IPv4 address
+         ipv4CopyAddr(&ipAddr, attr->value);
+         //Dump IPv4 address
+         TRACE_DEBUG("        %s\r\n", ipv4AddrToString(ipAddr, NULL));
+      }
+   }
+   //IPv4 address range?
+   else if(type == IKE_CONFIG_ATTR_TYPE_INTERNAL_IP4_SUBNET)
+   {
+      //This attribute can be 0 or 8 octets
+      if(n == (2 * sizeof(Ipv4Addr)))
+      {
+         Ipv4Addr ipAddr;
+         Ipv4Addr subnetMask;
+
+         //Copy IPv4 address
+         ipv4CopyAddr(&ipAddr, attr->value);
+         //Dump IPv4 address
+         TRACE_DEBUG("        %s\r\n", ipv4AddrToString(ipAddr, NULL));
+
+         //Copy subnet mask
+         ipv4CopyAddr(&subnetMask, attr->value + sizeof(Ipv4Addr));
+         //Dump subnet mask
+         TRACE_DEBUG("        %s\r\n", ipv4AddrToString(subnetMask, NULL));
+      }
+   }
+#endif
+#if (IPV6_SUPPORT == ENABLED)
+   //IPv6 address?
+   else if(type == IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_DNS ||
+      type == IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_DHCP)
+   {
+      //These attributes can be 0 or 16 octets
+      if(n == sizeof(Ipv6Addr))
+      {
+         Ipv6Addr ipAddr;
+
+         //Copy IPv6 address
+         ipv6CopyAddr(&ipAddr, attr->value);
+         //Dump IPv6 address
+         TRACE_DEBUG("        %s\r\n", ipv6AddrToString(&ipAddr, NULL));
+      }
+   }
+   //IPv6 prefix?
+   else if(type == IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_ADDRESS ||
+      type == IKE_CONFIG_ATTR_TYPE_INTERNAL_IP6_SUBNET)
+   {
+      //These attributes can be 0 or 17 octets
+      if(n == (sizeof(Ipv6Addr) + 1))
+      {
+         Ipv6Addr ipAddr;
+         uint8_t prefixLen;
+
+         //The attribute is made up of two fields: the first is a 16-octet
+         //IPv6 address, and the second is a one-octet prefix-length
+         ipv6CopyAddr(&ipAddr, attr->value);
+         prefixLen = attr->value[16];
+
+         //Dump IPv6 prefix
+         TRACE_DEBUG("        %s/%" PRIu8 "\r\n", ipv6AddrToString(&ipAddr, NULL),
+            prefixLen);
+      }
+   }
+#endif
+   //List of attributes?
+   else if(type == IKE_CONFIG_ATTR_TYPE_SUPPORTED_ATTRIBUTES)
+   {
+      //The length must be a multiple of 2
+      if((n % sizeof(uint16_t)) == 0)
+      {
+         //The attribute contains a set of attribute identifiers
+         for(i = 0; i < n; i += sizeof(uint16_t))
+         {
+            //Get the current 16-bit attribute identifier
+            type = LOAD16BE(attr->value + i);
+
+            //Convert the attribute identifier to string representation
+            configAttrTypeName = ikeGetParamName(type, ikeConfigAttrTypeList,
+               arraysize(ikeConfigAttrTypeList));
+
+            //Dump attribute identifier
+            TRACE_DEBUG("        Attribute ID = %" PRIu16 " (%s)\r\n", type,
+               configAttrTypeName);
+         }
+      }
+   }
+   //Unknown attribute type?
+   else
+   {
+      //Dump attribute value
+      if(n > 0)
+      {
+         TRACE_DEBUG_ARRAY("        ", attr->value, n);
+      }
+   }
+}
+
+
+/**
+ * @brief Dump EAP payload
+ * @param[in] payload Pointer to the payload to dump
+ * @param[in] length Length of the payload, in bytes
+ **/
+
+void ikeDumpEapPayload(const IkeEapPayload *payload, size_t length)
+{
+   size_t n;
+
+   //Check the length of the payload
+   if(length < sizeof(IkeEapPayload))
+      return;
+
+   //The EAP Message field has a variable length
+   n = length - sizeof(IkeEapPayload);
+
+   //Dump EAP Message field
+   TRACE_DEBUG("    EAP Message (%" PRIuSIZE " bytes)\r\n", n);
+
+#if (IKE_EAP_AUTH_SUPPORT == ENABLED)
+   //Dump EAP packet
+   ikeDumpEapPacket((IkeEapPacket *) payload->eapMessage, n);
+#else
+   //Dump EAP packet
+   TRACE_DEBUG_ARRAY("      ", payload->eapMessage, n);
+#endif
 }
 
 
@@ -1640,6 +1955,31 @@ void ikeDumpEncryptedFragPayload(const IkeEncryptedFragPayload *payload,
    //Dump encrypted data
    TRACE_DEBUG("    Encrypted Data (%" PRIuSIZE " bytes)\r\n", n);
    TRACE_DEBUG_ARRAY("      ", payload->iv, n);
+}
+
+
+/**
+ * @brief Dump string
+ * @param[in] prefix String to prepend to the left of the line
+ * @param[in] s Pointer to the string to dump
+ * @param[in] length Length of the string, in characters
+ **/
+
+void ikeDumpString(const char_t *prefix, const uint8_t *s, size_t length)
+{
+   size_t i;
+
+   //Display prefix
+   TRACE_DEBUG("%s\"", prefix);
+
+   //Dump string
+   for(i = 0; i < length; i++)
+   {
+      TRACE_DEBUG("%c", s[i]);
+   }
+
+   //Display suffix
+   TRACE_DEBUG("\"\r\n");
 }
 
 

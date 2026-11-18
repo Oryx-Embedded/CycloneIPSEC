@@ -179,6 +179,10 @@ error_t ikeComputeSharedSecret(IkeKeContext *keContext, uint8_t *output,
       //exchange
       error = dhComputeSharedSecret(&keContext->dhContext, output,
          IKE_MAX_SHARED_SECRET_LEN, outputLen);
+
+      //The ephemeral private key must be destroyed as soon as possible (refer
+      //to RFC 9206, section 10)
+      dhErasePrivateKey(&keContext->dhContext);
    }
    else
 #endif
@@ -190,6 +194,10 @@ error_t ikeComputeSharedSecret(IkeKeContext *keContext, uint8_t *output,
       //Diffie-Hellman common value (refer to RFC 5903, section 7)
       error = ecdhComputeSharedSecret(&keContext->ecdhContext, output,
          IKE_MAX_SHARED_SECRET_LEN, outputLen);
+
+      //The ephemeral private key must be destroyed as soon as possible (refer
+      //to RFC 9206, section 10)
+      ecdhErasePrivateKey(&keContext->ecdhContext);
    }
    else
 #endif

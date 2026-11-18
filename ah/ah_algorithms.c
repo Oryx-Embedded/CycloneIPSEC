@@ -72,19 +72,6 @@ static const uint16_t ahSupportedAuthAlgos[] =
 
 
 /**
- * @brief List of supported ESN transforms
- **/
-
-static const uint16_t ahSupportedEsnTranforms[] =
-{
-#if (AH_ESN_SUPPORT == ENABLED)
-   IKE_TRANSFORM_ID_ESN_YES,
-#endif
-   IKE_TRANSFORM_ID_ESN_NO
-};
-
-
-/**
  * @brief Select the relevant MAC algorithm
  * @param[in] childSa Pointer to the Child SA
  * @param[in] authAlgoId Authentication algorithm identifier
@@ -103,7 +90,6 @@ error_t ahSelectAuthAlgo(IkeChildSaEntry *childSa, uint16_t authAlgoId)
    if(authAlgoId == IKE_TRANSFORM_ID_AUTH_AES_CMAC_96)
    {
       childSa->authMacAlgo = MAC_ALGO_CMAC;
-      childSa->authHashAlgo = NULL;
       childSa->authCipherAlgo = AES_CIPHER_ALGO;
       childSa->authKeyLen = 16;
       childSa->icvLen = 12;
@@ -116,7 +102,6 @@ error_t ahSelectAuthAlgo(IkeChildSaEntry *childSa, uint16_t authAlgoId)
    {
       childSa->authMacAlgo = MAC_ALGO_HMAC;
       childSa->authHashAlgo = MD5_HASH_ALGO;
-      childSa->authCipherAlgo = NULL;
       childSa->authKeyLen = MD5_DIGEST_SIZE;
       childSa->icvLen = 12;
    }
@@ -128,7 +113,6 @@ error_t ahSelectAuthAlgo(IkeChildSaEntry *childSa, uint16_t authAlgoId)
    {
       childSa->authMacAlgo = MAC_ALGO_HMAC;
       childSa->authHashAlgo = SHA1_HASH_ALGO;
-      childSa->authCipherAlgo = NULL;
       childSa->authKeyLen = SHA1_DIGEST_SIZE;
       childSa->icvLen = 12;
    }
@@ -140,7 +124,6 @@ error_t ahSelectAuthAlgo(IkeChildSaEntry *childSa, uint16_t authAlgoId)
    {
       childSa->authMacAlgo = MAC_ALGO_HMAC;
       childSa->authHashAlgo = SHA256_HASH_ALGO;
-      childSa->authCipherAlgo = NULL;
       childSa->authKeyLen = SHA256_DIGEST_SIZE;
       childSa->icvLen = 16;
    }
@@ -152,7 +135,6 @@ error_t ahSelectAuthAlgo(IkeChildSaEntry *childSa, uint16_t authAlgoId)
    {
       childSa->authMacAlgo = MAC_ALGO_HMAC;
       childSa->authHashAlgo = SHA384_HASH_ALGO;
-      childSa->authCipherAlgo = NULL;
       childSa->authKeyLen = SHA384_DIGEST_SIZE;
       childSa->icvLen = 24;
    }
@@ -164,7 +146,6 @@ error_t ahSelectAuthAlgo(IkeChildSaEntry *childSa, uint16_t authAlgoId)
    {
       childSa->authMacAlgo = MAC_ALGO_HMAC;
       childSa->authHashAlgo = SHA512_HASH_ALGO;
-      childSa->authCipherAlgo = NULL;
       childSa->authKeyLen = SHA512_DIGEST_SIZE;
       childSa->icvLen = 32;
    }
@@ -221,7 +202,7 @@ error_t ahAddSupportedTransforms(IkeChildSaEntry *childSa,
       //An initiator who supports ESNs will usually include two ESN transforms,
       //with values "0" and "1", in its proposals (refer to RFC 7296,
       //section 3.3.2)
-      error = ahAddSupportedEsnTransforms(childSa, proposal, lastSubstruc);
+      error = ahAddSupportedSnTransforms(childSa, proposal, lastSubstruc);
    }
 
    //Return status code
@@ -260,28 +241,41 @@ error_t ahAddSupportedAuthTransforms(IkeChildSaEntry *childSa,
 
 
 /**
- * @brief Add the supported ESN transforms to the proposal
+ * @brief Add the supported SN transforms to the proposal
  * @param[in] childSa Pointer to the Child SA
  * @param[in,out] proposal Pointer to the Proposal substructure
  * @param[in,out] lastSubstruc Pointer to the Last Substruc field
  * @return Error code
  **/
 
-error_t ahAddSupportedEsnTransforms(IkeChildSaEntry *childSa,
+error_t ahAddSupportedSnTransforms(IkeChildSaEntry *childSa,
    IkeProposal *proposal, uint8_t **lastSubstruc)
 {
    error_t error;
-   uint_t i;
 
    //Initialize status code
    error = NO_ERROR;
 
-   //Loop through the list of supported ESN transforms
-   for(i = 0; i < arraysize(ahSupportedEsnTranforms) && !error; i++)
+#if (AH_ESN_SUPPORT == ENABLED)
+   //Check whether extended sequence numbers are preferred
+   if(childSa->esn)
    {
-      //Add a new transform to the proposal
-      error = ikeAddTransform(IKE_TRANSFORM_TYPE_ESN,
-         ahSupportedEsnTranforms[i], 0, proposal, lastSubstruc);
+      //Transform ID 1 defines sequence numbers as monotonically increasing
+      //64-bit counters. The low-order 32 bits are transmitted in the Sequence
+      //Number field of AH packets (refer to RFC 9827, section 3)
+      error = ikeAddTransform(IKE_TRANSFORM_TYPE_SN, IKE_TRANSFORM_ID_SN_64BIT,
+         0, proposal, lastSubstruc);
+   }
+#endif
+
+   //Check status code
+   if(!error)
+   {
+      //Transform ID 0 defines sequence numbers as monotonically increasing
+      //32-bit counters that are transmitted in the Sequence Number field of
+      //AH packets
+      error = ikeAddTransform(IKE_TRANSFORM_TYPE_SN, IKE_TRANSFORM_ID_SN_32BIT,
+         0, proposal, lastSubstruc);
    }
 
    //Return status code
@@ -307,19 +301,51 @@ uint16_t ahSelectAuthTransform(IkeChildSaEntry *childSa,
 
 
 /**
- * @brief ESN transform negotiation
+ * @brief SN transform negotiation
  * @param[in] childSa Pointer to the Child SA
  * @param[in] proposal Pointer to the Proposal substructure
  * @param[in] proposalLen Length of the Proposal substructure, in bytes
- * @return Selected ESN transform, if any
+ * @return Selected SN transform, if any
  **/
 
-uint16_t ahSelectEsnTransform(IkeChildSaEntry *childSa,
+uint16_t ahSelectSnTransform(IkeChildSaEntry *childSa,
    const IkeProposal *proposal, size_t proposalLen)
 {
-   //Select the ESN transform to use
-   return ikeSelectTransform(IKE_TRANSFORM_TYPE_ESN, ahSupportedEsnTranforms,
-      arraysize(ahSupportedEsnTranforms), proposal, proposalLen);
+   uint16_t transformId;
+
+   //Chosen SN transform
+   transformId = IKE_TRANSFORM_ID_INVALID;
+
+#if (AH_ESN_SUPPORT == ENABLED)
+   //Check whether extended sequence numbers are preferred
+   if(childSa->esn)
+   {
+      //Transform ID 1 defines sequence numbers as monotonically increasing
+      //64-bit counters. The low-order 32 bits are transmitted in the Sequence
+      //Number field of ESP packets (refer to RFC 9827, section 3)
+      if(ikeFindTranform(IKE_TRANSFORM_TYPE_SN, IKE_TRANSFORM_ID_SN_64BIT, 0,
+         proposal, proposalLen))
+      {
+         transformId = IKE_TRANSFORM_ID_SN_64BIT;
+      }
+   }
+#endif
+
+   //Invalid SN transform?
+   if(transformId == IKE_TRANSFORM_ID_INVALID)
+   {
+      //Transform ID 0 defines sequence numbers as monotonically increasing
+      //32-bit counters that are transmitted in the Sequence Number field of
+      //ESP packets
+      if(ikeFindTranform(IKE_TRANSFORM_TYPE_SN, IKE_TRANSFORM_ID_SN_32BIT, 0,
+         proposal, proposalLen))
+      {
+         transformId = IKE_TRANSFORM_ID_SN_32BIT;
+      }
+   }
+
+   //Return the chosen SN transform, if any
+   return transformId;
 }
 
 
@@ -344,7 +370,7 @@ error_t ahSelectSaProposal(IkeChildSaEntry *childSa,
    childSa->encAlgoId = IKE_TRANSFORM_ID_INVALID;
    childSa->encKeyLen = 0;
    childSa->authAlgoId = IKE_TRANSFORM_ID_INVALID;
-   childSa->esn = IKE_TRANSFORM_ID_INVALID;
+   childSa->snId = IKE_TRANSFORM_ID_INVALID;
 #if (IKE_CHILD_SA_PFS_SUPPORT == ENABLED)
    childSa->keContext.groupNum = IKE_TRANSFORM_ID_KE_NONE;
 #endif
@@ -403,12 +429,12 @@ error_t ahSelectSaProposal(IkeChildSaEntry *childSa,
 
             //Integrity transform negotiation
             childSa->authAlgoId = ahSelectAuthTransform(childSa, proposal, n);
-            //ESN transform negotiation
-            childSa->esn = ahSelectEsnTransform(childSa, proposal, n);
+            //SN transform negotiation
+            childSa->snId = ahSelectSnTransform(childSa, proposal, n);
 
             //Unacceptable proposal?
             if(childSa->authAlgoId == IKE_TRANSFORM_ID_INVALID ||
-               childSa->esn == IKE_TRANSFORM_ID_INVALID)
+               childSa->snId == IKE_TRANSFORM_ID_INVALID)
             {
                error = ERROR_INVALID_PROPOSAL;
             }
@@ -479,7 +505,7 @@ error_t ahCheckSaProposal(IkeChildSaEntry *childSa,
    childSa->encAlgoId = IKE_TRANSFORM_ID_INVALID;
    childSa->encKeyLen = 0;
    childSa->authAlgoId = IKE_TRANSFORM_ID_INVALID;
-   childSa->esn = IKE_TRANSFORM_ID_INVALID;
+   childSa->snId = IKE_TRANSFORM_ID_INVALID;
 
    //Retrieve the length of the SA payload
    length = ntohs(payload->header.payloadLength);
@@ -529,21 +555,21 @@ error_t ahCheckSaProposal(IkeChildSaEntry *childSa,
    //The accepted cryptographic suite must contain exactly one transform of
    //each type included in the proposal (refer to RFC 7296, section 2.7)
    if(ikeGetNumTransforms(IKE_TRANSFORM_TYPE_INTEG, proposal, n) != 1 ||
-      ikeGetNumTransforms(IKE_TRANSFORM_TYPE_ESN, proposal, n) != 1)
+      ikeGetNumTransforms(IKE_TRANSFORM_TYPE_SN, proposal, n) != 1)
    {
       return ERROR_INVALID_PROPOSAL;
    }
 
    //Get the selected integrity transform
    childSa->authAlgoId = ahSelectAuthTransform(childSa, proposal, n);
-   //Get the selected ESN transform
-   childSa->esn = ahSelectEsnTransform(childSa, proposal, n);
+   //Get the selected SN transform
+   childSa->snId = ahSelectSnTransform(childSa, proposal, n);
 
    //The initiator of an exchange must check that the accepted offer is
    //consistent with one of its proposals, and if not must terminate the
    //exchange (refer to RFC 7296, section 3.3.6)
    if(childSa->authAlgoId != IKE_TRANSFORM_ID_INVALID &&
-      childSa->esn != IKE_TRANSFORM_ID_INVALID)
+      childSa->snId != IKE_TRANSFORM_ID_INVALID)
    {
       return NO_ERROR;
    }

@@ -82,8 +82,8 @@ error_t ikeDecryptMessage(IkeSaEntry *sa, uint8_t *message, size_t *messageLen)
    //Cipher algorithm used to decrypt the packet
    cipherAlgo = sa->cipherAlgo;
 
-   //The encryption key is obtained from the SK_ei or SK_er key, whichever
-   //is appropriate
+   //The encryption key is obtained from the SK_ei or SK_er key, whichever is
+   //appropriate
    if(sa->originalInitiator)
    {
       encKey = sa->sker;
@@ -105,8 +105,8 @@ error_t ikeDecryptMessage(IkeSaEntry *sa, uint8_t *message, size_t *messageLen)
    //Padding, Pad Length, and Integrity Checksum Value (ICV)
    length = ntohs(encryptedPayload->header.payloadLength);
 
-   //The Encrypted payload, if present in a message, must be the last payload
-   //in the message (refer to RFC 7296, section 3.14)
+   //The Encrypted payload, if present in a message, must be the last payload in
+   //the message (refer to RFC 7296, section 3.14)
    if(((uint8_t *) encryptedPayload + length) != (message + n))
       return ERROR_INVALID_MESSAGE;
 
@@ -124,32 +124,42 @@ error_t ikeDecryptMessage(IkeSaEntry *sa, uint8_t *message, size_t *messageLen)
    //Point to the Integrity Checksum Value (ICV)
    icv = data + length;
 
+   //Initialize status code
+   error = NO_ERROR;
+
 #if (IKE_CBC_SUPPORT == ENABLED)
    //CBC cipher mode?
    if(sa->cipherMode == CIPHER_MODE_CBC)
    {
-      //The length of the ciphertext must be a multiple of the block size
-      if((length % cipherAlgo->blockSize) != 0)
-         return ERROR_INVALID_MESSAGE;
+      //Check the length of the ciphertext
+      if((length % cipherAlgo->blockSize) == 0)
+      {
+         //Verify checksum value
+         error = ikeVerifyChecksum(sa, message, n - sa->icvLen, icv);
 
-      //Verify checksum value
-      error = ikeVerifyChecksum(sa, message, n - sa->icvLen, icv);
-      //Any error to report?
-      if(error)
-         return error;
+         //Check status code
+         if(!error)
+         {
+            //Initialize cipher context
+            error = cipherAlgo->init(&sa->cipherContext, encKey, sa->encKeyLen);
 
-      //Initialize cipher context
-      error = cipherAlgo->init(&sa->cipherContext, encKey, sa->encKeyLen);
-      //Any error to report?
-      if(error)
-         return error;
+            //Check status code
+            if(!error)
+            {
+               //Perform CBC decryption
+               error = cbcDecrypt(cipherAlgo, &sa->cipherContext, iv, data,
+                  data, length);
 
-      //Perform CBC decryption
-      error = cbcDecrypt(cipherAlgo, &sa->cipherContext, iv, data, data,
-         length);
-      //Any error to report?
-      if(error)
-         return error;
+               //Erase cipher context
+               cipherAlgo->deinit(&sa->cipherContext);
+            }
+         }
+      }
+      else
+      {
+         //The length of the ciphertext must be a multiple of the block size
+         error = ERROR_INVALID_MESSAGE;
+      }
    }
    else
 #endif
@@ -164,28 +174,30 @@ error_t ikeDecryptMessage(IkeSaEntry *sa, uint8_t *message, size_t *messageLen)
       osMemcpy(counter, encKey + sa->encKeyLen, 4);
       osMemcpy(counter + 4, iv, 8);
 
-      //The block counter begins with the value of one and increments by one
-      //to generate the next portion of the key stream
+      //The block counter begins with the value of one and increments by one to
+      //generate the next portion of the key stream
       STORE32BE(1, counter + 12);
 
       //Verify checksum value
       error = ikeVerifyChecksum(sa, message, n - sa->icvLen, icv);
-      //Any error to report?
-      if(error)
-         return error;
 
-      //Initialize cipher context
-      error = cipherAlgo->init(&sa->cipherContext, encKey, sa->encKeyLen);
-      //Any error to report?
-      if(error)
-         return error;
+      //Check status code
+      if(!error)
+      {
+         //Initialize cipher context
+         error = cipherAlgo->init(&sa->cipherContext, encKey, sa->encKeyLen);
 
-      //Perform CTR decryption
-      error = ctrDecrypt(cipherAlgo, &sa->cipherContext,
-         cipherAlgo->blockSize * 8, counter, data, data, length);
-      //Any error to report?
-      if(error)
-         return error;
+         //Check status code
+         if(!error)
+         {
+            //Perform CTR decryption
+            error = ctrDecrypt(cipherAlgo, &sa->cipherContext,
+               cipherAlgo->blockSize * 8, counter, data, data, length);
+
+            //Erase cipher context
+            cipherAlgo->deinit(&sa->cipherContext);
+         }
+      }
    }
    else
 #endif
@@ -198,8 +210,8 @@ error_t ikeDecryptMessage(IkeSaEntry *sa, uint8_t *message, size_t *messageLen)
       uint8_t *aad;
       uint8_t nonce[11];
 
-      //Construct the nonce by concatenating the salt with the IV, in that
-      //order (refer to RFC 5282, section 4)
+      //Construct the nonce by concatenating the salt with the IV, in that order
+      //(refer to RFC 5282, section 4)
       osMemcpy(nonce, encKey + sa->encKeyLen, 3);
       osMemcpy(nonce + 3, iv, 8);
 
@@ -212,16 +224,17 @@ error_t ikeDecryptMessage(IkeSaEntry *sa, uint8_t *message, size_t *messageLen)
 
       //Initialize cipher context
       error = cipherAlgo->init(&sa->cipherContext, encKey, sa->encKeyLen);
-      //Any error to report?
-      if(error)
-         return error;
 
-      //Authenticated decryption using CCM
-      error = ccmDecrypt(sa->cipherAlgo, &sa->cipherContext, nonce, 11, aad,
-         aadLen, data, data, length, icv, sa->icvLen);
-      //Any error to report?
-      if(error)
-         return error;
+      //Check status code
+      if(!error)
+      {
+         //Authenticated decryption using CCM
+         error = ccmDecrypt(sa->cipherAlgo, &sa->cipherContext, nonce, 11,
+            aad, aadLen, data, data, length, icv, sa->icvLen);
+
+         //Erase cipher context
+         cipherAlgo->deinit(&sa->cipherContext);
+      }
    }
    else
 #endif
@@ -235,8 +248,8 @@ error_t ikeDecryptMessage(IkeSaEntry *sa, uint8_t *message, size_t *messageLen)
       uint8_t nonce[12];
       GcmContext gcmContext;
 
-      //Construct the nonce by concatenating the salt with the IV, in that
-      //order (refer to RFC 5282, section 4)
+      //Construct the nonce by concatenating the salt with the IV, in that order
+      //(refer to RFC 5282, section 4)
       osMemcpy(nonce, encKey + sa->encKeyLen, 4);
       osMemcpy(nonce + 4, iv, 8);
 
@@ -249,22 +262,27 @@ error_t ikeDecryptMessage(IkeSaEntry *sa, uint8_t *message, size_t *messageLen)
 
       //Initialize cipher context
       error = cipherAlgo->init(&sa->cipherContext, encKey, sa->encKeyLen);
-      //Any error to report?
-      if(error)
-         return error;
 
-      //Initialize GCM context
-      error = gcmInit(&gcmContext, sa->cipherAlgo, &sa->cipherContext);
-      //Any error to report?
-      if(error)
-         return error;
+      //Check status code
+      if(!error)
+      {
+         //Initialize GCM context
+         error = gcmInit(&gcmContext, sa->cipherAlgo, &sa->cipherContext);
 
-      //Authenticated decryption using GCM
-      error = gcmDecrypt(&gcmContext, nonce, 12, aad, aadLen, data, data,
-         length, icv, sa->icvLen);
-      //Any error to report?
-      if(error)
-         return error;
+         //Check status code
+         if(!error)
+         {
+            //Authenticated decryption using GCM
+            error = gcmDecrypt(&gcmContext, nonce, 12, aad, aadLen, data, data,
+               length, icv, sa->icvLen);
+
+            //Erase GCM context
+            gcmDeinit(&gcmContext);
+         }
+
+         //Erase cipher context
+         cipherAlgo->deinit(&sa->cipherContext);
+      }
    }
    else
 #endif
@@ -297,36 +315,47 @@ error_t ikeDecryptMessage(IkeSaEntry *sa, uint8_t *message, size_t *messageLen)
    //Invalid cipher mode?
    {
       //The specified cipher mode is not supported
-      return ERROR_UNSUPPORTED_CIPHER_MODE;
+      error = ERROR_UNSUPPORTED_CIPHER_MODE;
    }
 
-   //The Pad Length field is the length of the Padding field
-   n = data[length - 1];
+   //Check status code
+   if(!error)
+   {
+      //The Pad Length field is the length of the Padding field
+      n = data[length - 1];
 
-   //Malformed padding?
-   if((n + 1) > length)
-      return ERROR_DECRYPTION_FAILED;
+      //Check the length of the padding
+      if((n + 1) <= length)
+      {
+         //Strip padding bytes from the message
+         length -= n + 1;
 
-   //Strip padding bytes from the message
-   length -= n + 1;
+         //Total length of the resulting IKE message
+         *messageLen = sizeof(IkeHeader) + length;
 
-   //Total length of the resulting IKE message
-   *messageLen = sizeof(IkeHeader) + length;
+         //Fix the Next Payload and Length fields of the IKE header
+         ikeHeader->nextPayload = encryptedPayload->header.nextPayload;
+         ikeHeader->length = htonl(*messageLen);
 
-   //Fix the Next Payload and Length fields of the IKE header
-   ikeHeader->nextPayload = encryptedPayload->header.nextPayload;
-   ikeHeader->length = htonl(*messageLen);
+         //Strip the Encrypted payload header from the message
+         osMemmove(message + sizeof(IkeHeader), data, length);
 
-   //Strip the Encrypted payload header from the message
-   osMemmove(message + sizeof(IkeHeader), data, length);
+         //Debug message
+         TRACE_DEBUG("Decrypted IKE message (%" PRIuSIZE " bytes):\r\n",
+            *messageLen);
 
-   //Debug message
-   TRACE_DEBUG("Decrypted IKE message (%" PRIuSIZE " bytes):\r\n", *messageLen);
-   //Dump IKE message for debugging purpose
-   ikeDumpMessage(message, *messageLen);
+         //Dump IKE message for debugging purpose
+         ikeDumpMessage(message, *messageLen);
+      }
+      else
+      {
+         //Malformed padding
+         error = ERROR_DECRYPTION_FAILED;
+      }
+   }
 
-   //Successful processing
-   return NO_ERROR;
+   //Return status code
+   return error;
 }
 
 
@@ -342,14 +371,12 @@ error_t ikeDecryptMessage(IkeSaEntry *sa, uint8_t *message, size_t *messageLen)
 error_t ikeVerifyChecksum(IkeSaEntry *sa, const uint8_t *message,
    size_t length, const uint8_t *icv)
 {
-   size_t i;
-   uint8_t mask;
    error_t error;
    const uint8_t *authKey;
    uint8_t checksum[IKE_MAX_DIGEST_SIZE];
 
-   //The integrity protection key key is obtained from the SK_ai or SK_ar
-   //key, whichever is appropriate
+   //The integrity protection key is obtained from the SK_ai or SK_ar key,
+   //whichever is appropriate
    if(sa->originalInitiator)
    {
       authKey = sa->skar;
@@ -378,7 +405,12 @@ error_t ikeVerifyChecksum(IkeSaEntry *sa, const uint8_t *message,
          //The checksum must be computed over the encrypted message. Its length
          //is determined by the integrity algorithm negotiated
          cmacUpdate(cmacContext, message, length);
-         cmacFinal(cmacContext, checksum, sa->icvLen);
+
+         //Finalize CMAC calculation
+         error = cmacFinal(cmacContext, checksum, sa->icvLen);
+
+         //Erase CMAC context
+         cmacDeinit(cmacContext);
       }
    }
    else
@@ -402,6 +434,9 @@ error_t ikeVerifyChecksum(IkeSaEntry *sa, const uint8_t *message,
          //is determined by the integrity algorithm negotiated
          hmacUpdate(hmacContext, message, length);
          hmacFinal(hmacContext, checksum);
+
+         //Erase HMAC context
+         hmacDeinit(hmacContext);
       }
    }
    else
@@ -425,7 +460,12 @@ error_t ikeVerifyChecksum(IkeSaEntry *sa, const uint8_t *message,
          //The checksum must be computed over the encrypted message. Its length
          //is determined by the integrity algorithm negotiated
          xcbcMacUpdate(xcbcMacContext, message, length);
-         xcbcMacFinal(xcbcMacContext, checksum, sa->icvLen);
+
+         //Finalize XCBC-MAC calculation
+         error = xcbcMacFinal(xcbcMacContext, checksum, sa->icvLen);
+
+         //Erase XCBC-MAC context
+         xcbcMacDeinit(xcbcMacContext);
       }
    }
    else
@@ -439,14 +479,11 @@ error_t ikeVerifyChecksum(IkeSaEntry *sa, const uint8_t *message,
    //Check status code
    if(!error)
    {
-      //The calculated checksum is bitwise compared to the received ICV
-      for(mask = 0, i = 0; i < sa->icvLen; i++)
-      {
-         mask |= checksum[i] ^ icv[i];
-      }
-
       //The message is authenticated if and only if the checksums match
-      error = (mask == 0) ? NO_ERROR : ERROR_DECRYPTION_FAILED;
+      if(cryptoCompMem(checksum, icv, sa->icvLen) != 0)
+      {
+         error = ERROR_DECRYPTION_FAILED;
+      }
    }
 
    //Return status code

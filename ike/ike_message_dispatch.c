@@ -100,8 +100,11 @@ error_t ikeDispatchMessage(IkeContext *context, uint8_t *message, size_t length)
    ikeDumpMessage(message, length);
 
    //Check the length of the IKE message
-   if(length < ntohl(ikeHeader->length))
+   if(ntohl(ikeHeader->length) < sizeof(IkeHeader) ||
+      ntohl(ikeHeader->length) > length)
+   {
       return ERROR_INVALID_LENGTH;
+   }
 
    //The Length field indicates the total length of the IKE message in octets
    length = ntohl(ikeHeader->length);
@@ -230,10 +233,10 @@ error_t ikeDispatchRequest(IkeContext *context, uint8_t *message, size_t length)
                      //Check the state of the IKE SA
                      if(sa->state != IKE_SA_STATE_CLOSED) 
                      {
-                        //Only authentication failures (AUTHENTICATION_FAILED)
-                        //and malformed messages (INVALID_SYNTAX) lead to a
-                        //deletion of the IKE SA without requiring an explicit
-                        //INFORMATIONAL exchange carrying a Delete payload
+                        //Only authentication failures (AUTHENTICATION_FAILED
+                        //and EAP failure) and malformed messages (INVALID_SYNTAX)
+                        //lead to a deletion of the IKE SA without requiring an
+                        //explicit INFORMATIONAL exchange carrying a Delete payload
                         if(sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_AUTH_FAILED ||
                            sa->notifyMsgType == IKE_NOTIFY_MSG_TYPE_INVALID_SYNTAX)
                         {

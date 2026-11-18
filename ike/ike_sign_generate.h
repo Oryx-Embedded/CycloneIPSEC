@@ -42,33 +42,30 @@ extern "C" {
 #endif
 
 //IKEv2 related functions
-error_t ikeGenerateSignature(IkeSaEntry *sa, const uint8_t *id, size_t idLen,
-   uint8_t *authMethod, uint8_t *signature, size_t *signatureLen);
+error_t ikeGenerateSignature(IkeSaEntry *sa, uint8_t *authMethod,
+   uint8_t *signature, size_t *signatureLen);
 
-error_t ikeGenerateDigitalSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, IkeAuthData *authData, size_t *authDataLen);
+error_t ikeGenerateDigitalSignature(IkeSaEntry *sa, IkeAuthData *authData,
+   size_t *authDataLen);
 
-error_t ikeGenerateRsaSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const HashAlgo *hashAlgo, uint8_t *signature,
-   size_t *signatureLen);
+error_t ikeGenerateRsaSignature(IkeSaEntry *sa, const HashAlgo *hashAlgo,
+   uint8_t *signature, size_t *signatureLen);
 
-error_t ikeGenerateRsaPssSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const HashAlgo *hashAlgo, size_t saltLen, uint8_t *signature,
-   size_t *signatureLen);
+error_t ikeGenerateRsaPssSignature(IkeSaEntry *sa, const HashAlgo *hashAlgo,
+   size_t saltLen, uint8_t *signature, size_t *signatureLen);
 
-error_t ikeGenerateDsaSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const HashAlgo *hashAlgo, uint8_t *signature,
-   size_t *signatureLen, IkeSignFormat format);
-
-error_t ikeGenerateEcdsaSignature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, const EcCurve *group, const HashAlgo *hashAlgo,
+error_t ikeGenerateDsaSignature(IkeSaEntry *sa, const HashAlgo *hashAlgo,
    uint8_t *signature, size_t *signatureLen, IkeSignFormat format);
 
-error_t ikeGenerateEd25519Signature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, uint8_t *signature, size_t *signatureLen);
+error_t ikeGenerateEcdsaSignature(IkeSaEntry *sa, const EcCurve *group,
+   const HashAlgo *hashAlgo, uint8_t *signature, size_t *signatureLen,
+   IkeSignFormat format);
 
-error_t ikeGenerateEd448Signature(IkeSaEntry *sa, const uint8_t *id,
-   size_t idLen, uint8_t *signature, size_t *signatureLen);
+error_t ikeGenerateEd25519Signature(IkeSaEntry *sa, uint8_t *signature,
+   size_t *signatureLen);
+
+error_t ikeGenerateEd448Signature(IkeSaEntry *sa, uint8_t *signature,
+   size_t *signatureLen);
 
 //C++ guard
 #ifdef __cplusplus

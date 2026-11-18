@@ -37,6 +37,7 @@
 #include "ike/ike_payload_parse.h"
 #include "ike/ike_auth.h"
 #include "ike/ike_certificate.h"
+#include "ike/ike_eap.h"
 #include "ike/ike_key_exchange.h"
 #include "ike/ike_key_material.h"
 #include "ike/ike_sign_misc.h"
@@ -102,12 +103,22 @@ void ikeParseIkeMessagePayloads(const uint8_t *message, size_t length,
 
    //The Traffic Selector payload, denoted TSi and TSr, allows peers to identify
    //packet flows for processing by IPsec security services (refer to RFC 7296,
-   //section 3.13
+   //section 3.13)
    payloads->tsi = (IkeTsPayload *) ikeGetPayload(message, length,
       IKE_PAYLOAD_TYPE_TSI, 0);
 
    payloads->tsr = (IkeTsPayload *) ikeGetPayload(message, length,
       IKE_PAYLOAD_TYPE_TSR, 0);
+
+   //The Configuration payload, denoted CP, is used to exchange configuration
+   //information between IKE peers (refer to RFC 7296, section 3.15)
+   payloads->config = (IkeConfigPayload *) ikeGetPayload(message, length,
+      IKE_PAYLOAD_TYPE_CP, 0);
+
+   //The Extensible Authentication Protocol payload, denoted EAP, allows IKE SAs
+   //to be authenticated using EAP protocol (refer to RFC 7296, section 3.16)
+   payloads->eap = (IkeEapPayload *) ikeGetPayload(message, length,
+      IKE_PAYLOAD_TYPE_EAP, 0);
 
    //The USE_TRANSPORT_MODE notification may be included in a request
    //message that also includes an SA payload requesting a Child SA
@@ -165,6 +176,7 @@ void ikeParseIkeMessagePayloads(const uint8_t *message, size_t length,
 error_t ikeParseSaPayload(const IkeSaPayload *saPayload)
 {
    error_t error;
+   uint_t i;
    size_t n;
    size_t length;
    const uint8_t *p;
@@ -187,7 +199,7 @@ error_t ikeParseSaPayload(const IkeSaPayload *saPayload)
       return ERROR_INVALID_SYNTAX;
 
    //Loop through the Proposal substructures
-   while(length > 0)
+   for(i = 1; length > 0; i++)
    {
       //Malformed payload?
       if(length < sizeof(IkeProposal))
@@ -210,6 +222,39 @@ error_t ikeParseSaPayload(const IkeSaPayload *saPayload)
          //Report an error
          error = ERROR_INVALID_SYNTAX;
          break;
+      }
+
+      //The first proposal in an SA payload must be 1, and subsequent proposals
+      //must be one more than the previous proposal (refer to RFC 7296,
+      //section 3.3.1)
+      if(proposal->proposalNum != i)
+      {
+         //Report an error
+         error = ERROR_INVALID_SYNTAX;
+         break;
+      }
+
+      //The Last Substruc field has a value of 0 if this was the last Proposal
+      //substructure, and a value of 2 if there are more Proposal substructures
+      if(n == length)
+      {
+         //Last Proposal substructure?
+         if(proposal->lastSubstruc != IKE_LAST_SUBSTRUC_LAST)
+         {
+            //Report an error
+            error = ERROR_INVALID_SYNTAX;
+            break;
+         }
+      }
+      else
+      {
+         //More Proposal substructures?
+         if(proposal->lastSubstruc != IKE_LAST_SUBSTRUC_MORE_PROPOSALS)
+         {
+            //Report an error
+            error = ERROR_INVALID_SYNTAX;
+            break;
+         }
       }
 
       //Parse Proposal substructure
@@ -260,6 +305,9 @@ error_t ikeParseProposal(const IkeProposal *proposal, size_t length)
    if(proposal->numTransforms == 0)
       return ERROR_INVALID_SYNTAX;
 
+   //Initialize status code
+   error = NO_ERROR;
+
    //Loop through the Transform substructures
    for(i = 1; i <= proposal->numTransforms; i++)
    {
@@ -286,6 +334,30 @@ error_t ikeParseProposal(const IkeProposal *proposal, size_t length)
          break;
       }
 
+      //The Last Substruc field has a value of 0 if this was the last Transform
+      //substructure, and a value of 3 if there are more Transform substructures
+      //(refer to RFC 7296, section 3.3.2)
+      if(i == proposal->numTransforms)
+      {
+         //Last Transform substructure?
+         if(transform->lastSubstruc != IKE_LAST_SUBSTRUC_LAST)
+         {
+            //Report an error
+            error = ERROR_INVALID_SYNTAX;
+            break;
+         }
+      }
+      else
+      {
+         //More Transform substructures?
+         if(transform->lastSubstruc != IKE_LAST_SUBSTRUC_MORE_TRANSFORMS)
+         {
+            //Report an error
+            error = ERROR_INVALID_SYNTAX;
+            break;
+         }
+      }
+
       //Parse Transform substructure
       error = ikeParseTransform(transform, n);
       //Any error to report?
@@ -295,6 +367,17 @@ error_t ikeParseProposal(const IkeProposal *proposal, size_t length)
       //Jump to the next transform
       p += n;
       length -= n;
+   }
+
+   //Check status code
+   if(!error)
+   {
+      //The Proposal Length field must match the total length of the transforms
+      if(length != 0)
+      {
+         //Report an error
+         error = ERROR_INVALID_SYNTAX;
+      }
    }
 
    //Return status code
@@ -471,10 +554,15 @@ error_t ikeParseIdPayload(IkeSaEntry *sa, const IkeIdPayload *idPayload)
    if(n == 0 || n > IKE_MAX_ID_LEN)
       return ERROR_INVALID_LENGTH;
 
+   //Save identification type
+   sa->peerId.type = (IkeIdType) idPayload->idType;
+
+   //Save reserved field
+   osMemcpy(sa->peerId.reserved, idPayload->reserved, 3);
+
    //Save identification data
-   sa->peerIdType = (IkeIdType) idPayload->idType;
-   osMemcpy(sa->peerId, idPayload->idData, n);
-   sa->peerIdLen = n;
+   osMemcpy(sa->peerId.data, idPayload->idData, n);
+   sa->peerId.length = n;
 
    //Successful processing
    return NO_ERROR;
@@ -497,7 +585,7 @@ error_t ikeParseCertReqPayload(IkeSaEntry *sa,
    //Retrieve the length of the Identification payload
    n = ntohs(certReqPayload->header.payloadLength);
 
-   //Malformed Identification payload?
+   //Malformed Certificate Request payload?
    if(n < sizeof(IkeCertReqPayload))
       return ERROR_INVALID_SYNTAX;
 
@@ -511,6 +599,70 @@ error_t ikeParseCertReqPayload(IkeSaEntry *sa,
 
    //Successful processing
    return NO_ERROR;
+}
+
+
+/**
+ * @brief Parse Authentication payload
+ * @param[in] sa Pointer to the IKE SA
+ * @param[in] authPayload Pointer to the Authentication payload
+ * @param[in] certPayload Pointer to the first Certificate payload
+ * @return Error code
+ **/
+
+error_t ikeParseAuthPayload(IkeSaEntry *sa, const IkeAuthPayload *authPayload,
+   const IkeCertPayload *certPayload)
+{
+   size_t n;
+   size_t authDataLen;
+   size_t certDataLen;
+   const uint8_t *certData;
+
+   //Retrieve the length of the Authentication payload
+   n = ntohs(authPayload->header.payloadLength);
+
+   //Malformed Authentication payload?
+   if(n < sizeof(IkeAuthPayload))
+      return ERROR_INVALID_SYNTAX;
+
+   //Determine the length of the Authentication Data field
+   authDataLen = n - sizeof(IkeAuthPayload);
+
+   //Certificate authentication?
+   if(authPayload->authMethod == IKE_AUTH_METHOD_RSA ||
+      authPayload->authMethod == IKE_AUTH_METHOD_DSS ||
+      authPayload->authMethod == IKE_AUTH_METHOD_ECDSA_P256_SHA256 ||
+      authPayload->authMethod == IKE_AUTH_METHOD_ECDSA_P384_SHA384 ||
+      authPayload->authMethod == IKE_AUTH_METHOD_ECDSA_P521_SHA512 ||
+      authPayload->authMethod == IKE_AUTH_METHOD_DIGITAL_SIGN)
+   {
+      //The first CERT payload holds the public key used to validate the
+      //sender's AUTH payload (refer to RFC 7296, section 3.6)
+      if(certPayload == NULL)
+         return ERROR_AUTHENTICATION_FAILED;
+
+      //Retrieve the length of the Certificate payload
+      n = ntohs(certPayload->header.payloadLength);
+
+      //Malformed Certificate payload?
+      if(n < sizeof(IkeCertPayload))
+         return ERROR_INVALID_SYNTAX;
+
+      //Point to the Certificate Data field
+      certData = certPayload->certData;
+      //Determine the length of the Certificate Data field
+      certDataLen = n - sizeof(IkeCertPayload);
+   }
+   else
+   {
+      //The CERT payload is not used to validate the AUTH payload
+      certData = NULL;
+      certDataLen = 0;
+   }
+
+   //Verify the AUTH value
+   return ikeVerifyAuth(sa, authPayload->authMethod, authPayload->authData,
+      authDataLen, certData, certDataLen);
 }
 
 
@@ -763,12 +915,13 @@ error_t ikeParseNatDetectSrcIpNotification(IkeSaEntry *sa,
    }
 
    //The IKE_SA_INIT message contains a NAT_DETECTION_SOURCE_IP notification
-   sa->natDetectSrcIp = TRUE;
+   sa->natDetectSrcIpReceived = TRUE;
 
    //Sucessful processing
    return NO_ERROR;
 #else
-   //Minimal implementations are not required to support NAT traversal
+   //Minimal implementations are not required to support NAT traversal (refer
+   //to RFC 7296, section 4)
    return ERROR_NOT_IMPLEMENTED;
 #endif
 }
@@ -834,12 +987,13 @@ error_t ikeParseNatDetectDestIpNotification(IkeSaEntry *sa,
    }
 
    //The IKE_SA_INIT message contains a NAT_DETECTION_DESTINATION_IP notification
-   sa->natDetectDestIp = TRUE;
+   sa->natDetectDestIpReceived = TRUE;
 
    //Sucessful processing
    return NO_ERROR;
 #else
-   //Minimal implementations are not required to support NAT traversal
+   //Minimal implementations are not required to support NAT traversal (refer
+   //to RFC 7296, section 4)
    return ERROR_NOT_IMPLEMENTED;
 #endif
 }
@@ -1149,6 +1303,73 @@ error_t ikeParseTsEntry(const IkeTs *ts, size_t length, IkeTsEntry *tsEntry)
 
 
 /**
+ * @brief Parse Configuration payload
+ * @param[in] sa Pointer to the IKE SA
+ * @param[in] configPayload Pointer to the Configuration payload
+ * @return Error code
+ **/
+
+error_t ikeParseConfigPayload(IkeSaEntry *sa,
+   const IkeConfigPayload *configPayload)
+{
+   //Minimal implementations are not required to support requesting temporary
+   //IP addresses (refer to RFC 7296, section 4)
+   return ERROR_NOT_IMPLEMENTED;
+}
+
+
+/**
+ * @brief Parse EAP payload
+ * @param[in] sa Pointer to the IKE SA
+ * @param[in] eapPayload Pointer to the EAP payload
+ * @return Error code
+ **/
+
+error_t ikeParseEapPayload(IkeSaEntry *sa, const IkeEapPayload *eapPayload)
+{
+#if (IKE_EAP_AUTH_SUPPORT == ENABLED)
+   error_t error;
+   size_t n;
+
+   //Retrieve the length of the EAP payload
+   n = ntohs(eapPayload->header.payloadLength);
+
+   //Malformed payload?
+   if(n < sizeof(IkeEapPayload))
+      return ERROR_INVALID_SYNTAX;
+
+   //Determine the length of the EAP message
+   n -= sizeof(IkeEapPayload);
+
+   //Increment the number of EAP request received
+   sa->eapRequestCount++;
+
+   //Process EAP message
+   error = ikeProcessEapPacket(sa, (IkeEapPacket *) eapPayload->eapMessage, n);
+
+   //Check status code
+   if(!error)
+   {
+      //The initiator of an IKE SA using EAP needs to be capable of extending
+      //the initial protocol exchange to at least ten IKE_AUTH exchanges
+      if(sa->eapState != IKE_EAP_STATE_SUCCESS &&
+         sa->eapRequestCount >= IKE_MAX_EAP_EXCHANGES)
+      {
+         error = ERROR_AUTHENTICATION_FAILED;
+      }
+   }
+
+   //Return status code
+   return error;
+#else
+   //Minimal implementations are not required to support EAP-based
+   //authentication (refer to RFC 7296, section 4)
+   return ERROR_NOT_IMPLEMENTED;
+#endif
+}
+
+
+/**
  * @brief Search an IKE message for a given payload type
  * @param[in] message Pointer to the IKE message
  * @param[in] length Length of the IKE message, in bytes
@@ -1168,54 +1389,58 @@ const IkePayloadHeader *ikeGetPayload(const uint8_t *message, size_t length,
    const IkeHeader *ikeHeader;
    const IkePayloadHeader *payload;
 
-   //Point to the IKE header
-   ikeHeader = (IkeHeader *) message;
-
-   //The Next Payload field indicates the type of payload that immediately
-   //follows the header
-   nextPayload = ikeHeader->nextPayload;
-
-   //Initialize occurrence index
-   i = 0;
-
-   //Point to the IKE payloads
-   p = message + sizeof(IkeHeader);
-   //Get the length of the IKE payloads, in bytes
-   length -= sizeof(IkeHeader);
-
-   //Following the header are one or more IKE payloads each identified by
-   //a Next Payload field in the preceding payload
-   while(nextPayload != IKE_PAYLOAD_TYPE_LAST &&
-      length >= sizeof(IkePayloadHeader))
+   //Check the length of the IKE message
+   if(length >= sizeof(IkeHeader))
    {
-      //Each IKE payload begins with a generic payload header
-      payload = (IkePayloadHeader *) p;
+      //Point to the IKE header
+      ikeHeader = (IkeHeader *) message;
 
-      //The Payload Length field indicates the length in octets of the current
-      //payload, including the generic payload header
-      n = ntohs(payload->payloadLength);
+      //The Next Payload field indicates the type of payload that immediately
+      //follows the header
+      nextPayload = ikeHeader->nextPayload;
 
-      //Check the length of the IKE payload
-      if(n < sizeof(IkePayloadHeader) || n > length)
-         return NULL;
+      //Initialize occurrence index
+      i = 0;
 
-      //Check IKE payload type
-      if(nextPayload == type)
+      //Point to the IKE payloads
+      p = message + sizeof(IkeHeader);
+      //Get the length of the IKE payloads, in bytes
+      length -= sizeof(IkeHeader);
+
+      //Following the header are one or more IKE payloads each identified by
+      //a Next Payload field in the preceding payload
+      while(nextPayload != IKE_PAYLOAD_TYPE_LAST &&
+         length >= sizeof(IkePayloadHeader))
       {
-         //Matching occurrence found?
-         if(i++ == index)
+         //Each IKE payload begins with a generic payload header
+         payload = (IkePayloadHeader *) p;
+
+         //The Payload Length field indicates the length in octets of the
+         //current payload, including the generic payload header
+         n = ntohs(payload->payloadLength);
+
+         //Check the length of the IKE payload
+         if(n < sizeof(IkePayloadHeader) || n > length)
+            return NULL;
+
+         //Check IKE payload type
+         if(nextPayload == type)
          {
-            return payload;
+            //Matching occurrence found?
+            if(i++ == index)
+            {
+               return payload;
+            }
          }
+
+         //The Next Payload field indicates the payload type of the next
+         //payload in the message
+         nextPayload = payload->nextPayload;
+
+         //Jump to the next IKE payload
+         p += n;
+         length -= n;
       }
-
-      //The Next Payload field indicates the payload type of the next payload
-      //in the message
-      nextPayload = payload->nextPayload;
-
-      //Jump to the next IKE payload
-      p += n;
-      length -= n;
    }
 
    //The specified payload type was not found
@@ -1240,63 +1465,67 @@ const IkeNotifyPayload *ikeGetErrorNotifyPayload(const uint8_t *message,
    const IkePayloadHeader *payload;
    const IkeNotifyPayload *notifyPayload;
 
-   //Point to the IKE header
-   ikeHeader = (IkeHeader *) message;
-
-   //The Next Payload field indicates the type of payload that immediately
-   //follows the header
-   nextPayload = ikeHeader->nextPayload;
-
-   //Point to the IKE payloads
-   p = message + sizeof(IkeHeader);
-   //Get the length of the IKE payloads, in bytes
-   length -= sizeof(IkeHeader);
-
-   //Following the header are one or more IKE payloads each identified by
-   //a Next Payload field in the preceding payload
-   while(nextPayload != IKE_PAYLOAD_TYPE_LAST &&
-      length >= sizeof(IkePayloadHeader))
+   //Check the length of the IKE message
+   if(length >= sizeof(IkeHeader))
    {
-      //Each IKE payload begins with a generic payload header
-      payload = (IkePayloadHeader *) p;
+      //Point to the IKE header
+      ikeHeader = (IkeHeader *) message;
 
-      //The Payload Length field indicates the length in octets of the current
-      //payload, including the generic payload header
-      n = ntohs(payload->payloadLength);
+      //The Next Payload field indicates the type of payload that immediately
+      //follows the header
+      nextPayload = ikeHeader->nextPayload;
 
-      //Check the length of the IKE payload
-      if(n < sizeof(IkePayloadHeader) || n > length)
-         return NULL;
+      //Point to the IKE payloads
+      p = message + sizeof(IkeHeader);
+      //Get the length of the IKE payloads, in bytes
+      length -= sizeof(IkeHeader);
 
-      //Notify payload?
-      if(nextPayload == IKE_PAYLOAD_TYPE_N)
+      //Following the header are one or more IKE payloads each identified by
+      //a Next Payload field in the preceding payload
+      while(nextPayload != IKE_PAYLOAD_TYPE_LAST &&
+         length >= sizeof(IkePayloadHeader))
       {
-         //Point to the Notify payload
-         notifyPayload = (IkeNotifyPayload *) p;
+         //Each IKE payload begins with a generic payload header
+         payload = (IkePayloadHeader *) p;
 
-         //Malformed Notify payload?
-         if(n < sizeof(IkeNotifyPayload))
+         //The Payload Length field indicates the length in octets of the
+         //current payload, including the generic payload header
+         n = ntohs(payload->payloadLength);
+
+         //Check the length of the IKE payload
+         if(n < sizeof(IkePayloadHeader) || n > length)
             return NULL;
 
-         //Check the length of the SPI
-         if(n < (sizeof(IkeNotifyPayload) + notifyPayload->spiSize))
-            return NULL;
-
-         //Types in the range 0-16383 are intended for reporting errors (refer
-         //to RFC 7296, section 3.10.1)
-         if(ntohs(notifyPayload->notifyMsgType) < 16384)
+         //Notify payload?
+         if(nextPayload == IKE_PAYLOAD_TYPE_N)
          {
-            return notifyPayload;
+            //Point to the Notify payload
+            notifyPayload = (IkeNotifyPayload *) p;
+
+            //Malformed Notify payload?
+            if(n < sizeof(IkeNotifyPayload))
+               return NULL;
+
+            //Check the length of the SPI
+            if(n < (sizeof(IkeNotifyPayload) + notifyPayload->spiSize))
+               return NULL;
+
+            //Types in the range 0-16383 are intended for reporting errors
+            //(refer to RFC 7296, section 3.10.1)
+            if(ntohs(notifyPayload->notifyMsgType) < 16384)
+            {
+               return notifyPayload;
+            }
          }
+
+         //The Next Payload field indicates the payload type of the next
+         //payload in the message
+         nextPayload = payload->nextPayload;
+
+         //Jump to the next IKE payload
+         p += n;
+         length -= n;
       }
-
-      //The Next Payload field indicates the payload type of the next payload
-      //in the message
-      nextPayload = payload->nextPayload;
-
-      //Jump to the next IKE payload
-      p += n;
-      length -= n;
    }
 
    //The specified payload type was not found
@@ -1324,69 +1553,73 @@ const IkeNotifyPayload *ikeGetStatusNotifyPayload(const uint8_t *message,
    const IkePayloadHeader *payload;
    const IkeNotifyPayload *notifyPayload;
 
-   //Point to the IKE header
-   ikeHeader = (IkeHeader *) message;
-
-   //The Next Payload field indicates the type of payload that immediately
-   //follows the header
-   nextPayload = ikeHeader->nextPayload;
-
-   //Initialize occurrence index
-   i = 0;
-
-   //Point to the IKE payloads
-   p = message + sizeof(IkeHeader);
-   //Get the length of the IKE payloads, in bytes
-   length -= sizeof(IkeHeader);
-
-   //Following the header are one or more IKE payloads each identified by
-   //a Next Payload field in the preceding payload
-   while(nextPayload != IKE_PAYLOAD_TYPE_LAST &&
-      length >= sizeof(IkePayloadHeader))
+   //Check the length of the IKE message
+   if(length >= sizeof(IkeHeader))
    {
-      //Each IKE payload begins with a generic payload header
-      payload = (IkePayloadHeader *) p;
+      //Point to the IKE header
+      ikeHeader = (IkeHeader *) message;
 
-      //The Payload Length field indicates the length in octets of the current
-      //payload, including the generic payload header
-      n = ntohs(payload->payloadLength);
+      //The Next Payload field indicates the type of payload that immediately
+      //follows the header
+      nextPayload = ikeHeader->nextPayload;
 
-      //Check the length of the IKE payload
-      if(n < sizeof(IkePayloadHeader) || n > length)
-         return NULL;
+      //Initialize occurrence index
+      i = 0;
 
-      //Notify payload?
-      if(nextPayload == IKE_PAYLOAD_TYPE_N)
+      //Point to the IKE payloads
+      p = message + sizeof(IkeHeader);
+      //Get the length of the IKE payloads, in bytes
+      length -= sizeof(IkeHeader);
+
+      //Following the header are one or more IKE payloads each identified by
+      //a Next Payload field in the preceding payload
+      while(nextPayload != IKE_PAYLOAD_TYPE_LAST &&
+         length >= sizeof(IkePayloadHeader))
       {
-         //Point to the Notify payload
-         notifyPayload = (IkeNotifyPayload *) p;
+         //Each IKE payload begins with a generic payload header
+         payload = (IkePayloadHeader *) p;
 
-         //Malformed Notify payload?
-         if(n < sizeof(IkeNotifyPayload))
+         //The Payload Length field indicates the length in octets of the
+         //current payload, including the generic payload header
+         n = ntohs(payload->payloadLength);
+
+         //Check the length of the IKE payload
+         if(n < sizeof(IkePayloadHeader) || n > length)
             return NULL;
 
-         //Check the length of the SPI
-         if(n < (sizeof(IkeNotifyPayload) + notifyPayload->spiSize))
-            return NULL;
-
-         //Check the type of the notification message
-         if(ntohs(notifyPayload->notifyMsgType) == type)
+         //Notify payload?
+         if(nextPayload == IKE_PAYLOAD_TYPE_N)
          {
-            //Matching occurrence found?
-            if(i++ == index)
+            //Point to the Notify payload
+            notifyPayload = (IkeNotifyPayload *) p;
+
+            //Malformed Notify payload?
+            if(n < sizeof(IkeNotifyPayload))
+               return NULL;
+
+            //Check the length of the SPI
+            if(n < (sizeof(IkeNotifyPayload) + notifyPayload->spiSize))
+               return NULL;
+
+            //Check the type of the notification message
+            if(ntohs(notifyPayload->notifyMsgType) == type)
             {
-               return notifyPayload;
+               //Matching occurrence found?
+               if(i++ == index)
+               {
+                  return notifyPayload;
+               }
             }
          }
+
+         //The Next Payload field indicates the payload type of the next
+         //payload in the message
+         nextPayload = payload->nextPayload;
+
+         //Jump to the next IKE payload
+         p += n;
+         length -= n;
       }
-
-      //The Next Payload field indicates the payload type of the next payload
-      //in the message
-      nextPayload = payload->nextPayload;
-
-      //Jump to the next IKE payload
-      p += n;
-      length -= n;
    }
 
    //The specified payload type was not found
@@ -1406,18 +1639,22 @@ const IkeNotifyPayload *ikeGetStatusNotifyPayload(const uint8_t *message,
 error_t ikeCheckCriticalPayloads(const uint8_t *message, size_t length,
    uint8_t *unsupportedCriticalPayload)
 {
+   error_t error;
    size_t n;
    uint8_t nextPayload;
    const uint8_t *p;
    const IkeHeader *ikeHeader;
    const IkePayloadHeader *payload;
 
+   //Malformed IKE message?
+   if(length < sizeof(IkeHeader))
+      return ERROR_INVALID_SYNTAX;
+
+   //Initialize status code
+   error = NO_ERROR;
+
    //Point to the IKE header
    ikeHeader = (IkeHeader *) message;
-
-   //Check the length of the IKE message
-   if(length < ntohl(ikeHeader->length))
-      return ERROR_INVALID_SYNTAX;
 
    //The Next Payload field indicates the type of payload that immediately
    //follows the header
@@ -1434,7 +1671,11 @@ error_t ikeCheckCriticalPayloads(const uint8_t *message, size_t length,
    {
       //Malformed IKE message?
       if(length < sizeof(IkePayloadHeader))
-         return ERROR_INVALID_SYNTAX;
+      {
+         //Report an error
+         error = ERROR_INVALID_SYNTAX;
+         break;
+      }
 
       //Each IKE payload begins with a generic payload header
       payload = (IkePayloadHeader *) p;
@@ -1445,7 +1686,11 @@ error_t ikeCheckCriticalPayloads(const uint8_t *message, size_t length,
 
       //Check the length of the IKE payload
       if(n < sizeof(IkePayloadHeader) || n > length)
-         return ERROR_INVALID_SYNTAX;
+      {
+         //Report an error
+         error = ERROR_INVALID_SYNTAX;
+         break;
+      }
 
       //Check whether the critical flag is set
       if(payload->critical)
@@ -1461,7 +1706,8 @@ error_t ikeCheckCriticalPayloads(const uint8_t *message, size_t length,
             }
 
             //The message must be rejected
-            return ERROR_UNSUPPORTED_OPTION;
+            error = ERROR_UNSUPPORTED_OPTION;
+            break;
          }
       }
 
@@ -1474,8 +1720,20 @@ error_t ikeCheckCriticalPayloads(const uint8_t *message, size_t length,
       length -= n;
    }
 
-   //Successful processing
-   return NO_ERROR;
+   //Check status code
+   if(!error)
+   {
+      //The last payload of the chain must end exactly at the end of the IKE
+      //message
+      if(length != 0)
+      {
+         //Report an error
+         error = ERROR_INVALID_SYNTAX;
+      }
+   }
+
+   //Return status code
+   return error;
 }
 
 #endif
